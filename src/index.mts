@@ -103,20 +103,35 @@ async function downloadSubtitles(url: string): Promise<string> {
 /**
  * Downloads a YouTube video to the user's default Downloads folder.
  * @param url The URL of the YouTube video.
- * @returns A success message.
+ * @returns A detailed success message including the filename.
  */
 async function downloadVideo(url: string): Promise<string> {
-  // Determine the user's Downloads directory (works for Windows, macOS, and Linux by default)
+  // Determine the user's Downloads directory
   const userDownloadsDir = path.join(os.homedir(), "Downloads");
+  
+  try {
+    // First get video info to know the filename
+    const infoResult = await spawnPromise("yt-dlp", [
+      "--print", "filename",
+      "--output", path.join(userDownloadsDir, "%(title)s.%(ext)s"),
+      "--no-download",
+      url
+    ]);
+    
+    const expectedFilename = infoResult.trim();
+    
+    // Download with progress info
+    await spawnPromise("yt-dlp", [
+      "--progress",
+      "--newline",
+      "--output", path.join(userDownloadsDir, "%(title)s.%(ext)s"),
+      url
+    ]);
 
-  // Use yt-dlp to download the video into the Downloads folder using a default filename template
-  await spawnPromise("yt-dlp", [
-    url,
-    "-o",
-    path.join(userDownloadsDir, "%(title)s.%(ext)s"),
-  ]);
-
-  return `Video successfully downloaded to ${userDownloadsDir}`;
+    return `Video successfully downloaded as "${path.basename(expectedFilename)}" to ${userDownloadsDir}`;
+  } catch (error) {
+    throw new Error(`Failed to download video: ${error}`);
+  }
 }
 
 /**

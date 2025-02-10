@@ -1,10 +1,23 @@
 {
   "name": "@kevinwatt/yt-dlp-mcp",
   "version": "0.5.1",
+  "description": "YouTube yt-dlp MCP Server - Download YouTube content via Model Context Protocol",
+  "keywords": ["mcp", "youtube", "yt-dlp", "dive", "llm"],
+  "homepage": "https://github.com/kevinwatt/yt-dlp-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/kevinwatt/yt-dlp-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinwatt/yt-dlp-mcp.git"
+  },
   "bin": {
     "yt-dlp-mcp": "lib/index.mjs"
   },
-  "description": "YouTube video download for MCP",
+  "files": [
+    "lib",
+    "README.md"
+  ],
   "main": "./lib/index.mjs",
   "scripts": {
     "prepare": "tsc && shx chmod +x ./lib/index.mjs"
