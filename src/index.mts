@@ -106,25 +106,36 @@ async function downloadSubtitles(url: string): Promise<string> {
  * @returns A detailed success message including the filename.
  */
 async function downloadVideo(url: string): Promise<string> {
-  // Determine the user's Downloads directory
   const userDownloadsDir = path.join(os.homedir(), "Downloads");
   
   try {
+    // Get current timestamp for filename
+    const timestamp = new Date().toISOString()
+      .replace(/[:.]/g, '-')
+      .replace('T', '_')
+      .split('.')[0];
+    
+    const outputTemplate = path.join(
+      userDownloadsDir, 
+      `%(title)s_${timestamp}.%(ext)s`
+    );
+
     // First get video info to know the filename
     const infoResult = await spawnPromise("yt-dlp", [
       "--print", "filename",
-      "--output", path.join(userDownloadsDir, "%(title)s.%(ext)s"),
+      "--output", outputTemplate,
       "--no-download",
       url
     ]);
     
     const expectedFilename = infoResult.trim();
     
-    // Download with progress info
+    // Download with progress info and set modification time to now
     await spawnPromise("yt-dlp", [
       "--progress",
       "--newline",
-      "--output", path.join(userDownloadsDir, "%(title)s.%(ext)s"),
+      "--mtime",
+      "--output", outputTemplate,
       url
     ]);
 
