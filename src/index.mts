@@ -17,7 +17,7 @@ import { rimraf } from "rimraf";
 const server = new Server(
   {
     name: "yt-dlp-mcp",
-    version: "0.6.4",
+    version: "0.6.5",
   },
   {
     capabilities: {
