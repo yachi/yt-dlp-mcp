@@ -1,8 +1,14 @@
 {
   "name": "@kevinwatt/yt-dlp-mcp",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "YouTube yt-dlp MCP Server - Download YouTube content via Model Context Protocol",
-  "keywords": ["mcp", "youtube", "yt-dlp", "dive", "llm"],
+  "keywords": [
+    "mcp",
+    "youtube",
+    "yt-dlp",
+    "dive",
+    "llm"
+  ],
   "homepage": "https://github.com/kevinwatt/yt-dlp-mcp#readme",
   "bugs": {
     "url": "https://github.com/kevinwatt/yt-dlp-mcp/issues"
