@@ -17,7 +17,7 @@ import { rimraf } from "rimraf";
 const server = new Server(
   {
     name: "yt-dlp-mcp",
-    version: "0.6.2",
+    version: "0.6.3",
   },
   {
     capabilities: {
@@ -117,7 +117,8 @@ async function downloadVideo(url: string): Promise<string> {
       
     const outputTemplate = path.join(
       userDownloadsDir,
-      `%(title)s [%(id)s] ${timestamp}.%(ext)s`
+      // Limit title length to 50 characters to avoid filename too long error
+      `%(title).50s [%(id)s] ${timestamp}.%(ext)s`
     );
 
     // Get expected filename
