@@ -6,11 +6,11 @@ Uses `yt-dlp` to download YouTube content and connects it to LLMs via [Model Con
 
 - Download YouTube subtitles (SRT format) for LLMs to read
 - Download YouTube videos to your Downloads folder
-- Integrates with Claude.ai and other MCP-compatible LLMs
+- Integrates with Dive and other MCP-compatible LLMs
 
 ## Installation
 
-1. Install `yt-dlp` (Homebrew and WinGet both work great here)
+1. Install `yt-dlp` (Pip, Homebrew and WinGet both work great here)
 
 yt-dlp-mcp requires the yt-dlp package. Install it based on your operating system:
 
