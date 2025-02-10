@@ -17,7 +17,7 @@ import { rimraf } from "rimraf";
 const server = new Server(
   {
     name: "yt-dlp-mcp",
-    version: "0.5.1",
+    version: "0.6.2",
   },
   {
     capabilities: {
@@ -114,27 +114,25 @@ async function downloadVideo(url: string): Promise<string> {
       .replace(/[:.]/g, '-')
       .replace('T', '_')
       .split('.')[0];
-    
+      
     const outputTemplate = path.join(
-      userDownloadsDir, 
-      `%(title)s_${timestamp}.%(ext)s`
+      userDownloadsDir,
+      `%(title)s [%(id)s] ${timestamp}.%(ext)s`
     );
 
-    // First get video info to know the filename
+    // Get expected filename
     const infoResult = await spawnPromise("yt-dlp", [
-      "--print", "filename",
+      "--get-filename",
       "--output", outputTemplate,
-      "--no-download",
       url
     ]);
-    
     const expectedFilename = infoResult.trim();
     
-    // Download with progress info and set modification time to now
+    // Download with progress info and use current time
     await spawnPromise("yt-dlp", [
       "--progress",
-      "--newline",
-      "--mtime",
+      "--newline", 
+      "--no-mtime",     // Don't use video upload time
       "--output", outputTemplate,
       url
     ]);
