@@ -11,21 +11,18 @@ Uses `yt-dlp` to download YouTube content and connects it to LLMs via [Model Con
 ## Installation
 
 1. Install `yt-dlp` (Homebrew and WinGet both work great here)
-### Additional Setup for yt-dlp-mcp
 
 yt-dlp-mcp requires the yt-dlp package. Install it based on your operating system:
 
-#### Windows
+Windows
 ```bash
 winget install yt-dlp
 ```
-
-#### MacOS
+MacOS
 ```bash
 brew install yt-dlp
 ```
-
-#### Linux
+Linux
 ```bash
 pip install yt-dlp
 ```
