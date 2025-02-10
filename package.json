@@ -1,0 +1,30 @@
+{
+  "name": "@kevinwatt/yt-dlp-mcp",
+  "version": "0.5.1",
+  "bin": {
+    "yt-dlp-mcp": "lib/index.mjs"
+  },
+  "description": "YouTube video download for MCP",
+  "main": "./lib/index.mjs",
+  "scripts": {
+    "prepare": "tsc && shx chmod +x ./lib/index.mjs"
+  },
+  "author": "Dewei Yen <k@funmula.com>",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./lib/index.mjs"
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "0.7.0",
+    "rimraf": "^6.0.1",
+    "spawn-rx": "^4.0.0"
+  },
+  "devDependencies": {
+    "shx": "^0.3.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
