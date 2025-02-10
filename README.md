@@ -12,9 +12,19 @@ Uses `yt-dlp` to download YouTube content and connects it to LLMs via [Model Con
 
 1. Install `yt-dlp` (Homebrew and WinGet both work great here)
 2. Install this via [dive](https://github.com/OpenAgentPlatform/Dive):
-   ```bash
-   mcp-installer install @kevinwatt/yt-dlp-mcp
-   ```
+```json
+{
+  "mcpServers": {
+    "yt-dlp-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@kevinwatt/yt-dlp-mcp"
+      ]
+    }
+  }
+}
+```
 
 ## Usage Examples
 
