@@ -25,7 +25,7 @@ brew install yt-dlp
 pip install yt-dlp
 ```
 
-### With Dive Desktop
+### With [Dive Desktop](https://github.com/OpenAgentPlatform/Dive)
 
 1. Click "+ Add MCP Server" in Dive Desktop
 2. Copy and paste this configuration:
