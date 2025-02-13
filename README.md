@@ -1,33 +1,31 @@
-# YouTube MCP Server
+# yt-dlp-mcp
 
-Uses `yt-dlp` to download YouTube content and connects it to LLMs via [Model Context Protocol](https://modelcontextprotocol.io/introduction). 
+An MCP server implementation that integrates with yt-dlp, providing YouTube content download capabilities for LLMs.
 
 ## Features
 
-- Download YouTube subtitles (SRT format) for LLMs to read
-- Download YouTube videos to your Downloads folder
-- Integrates with Dive and other MCP-compatible LLMs
+* **YouTube Subtitles**: Download subtitles in SRT format for LLMs to read
+* **Video Download**: Save videos to your Downloads folder
+* **MCP Integration**: Works with Dive and other MCP-compatible LLMs
 
-## Install yt-dlp
+## Installation
 
-1. Install `yt-dlp` (Pip, Homebrew and WinGet both work great here)
+### Prerequisites
 
-yt-dlp-mcp requires the yt-dlp package. Install it based on your operating system:
+Install `yt-dlp` based on your operating system:
 
-Windows
 ```bash
+# Windows
 winget install yt-dlp
-```
-MacOS
-```bash
+
+# macOS
 brew install yt-dlp
-```
-Linux
-```bash
+
+# Linux
 pip install yt-dlp
 ```
 
-## Install via [Dive Desktop](https://github.com/OpenAgentPlatform/Dive):
+### With Dive Desktop
 
 1. Click "+ Add MCP Server" in Dive Desktop
 2. Copy and paste this configuration:
@@ -35,7 +33,7 @@ pip install yt-dlp
 ```json
 {
   "mcpServers": {
-    "yt-dlp-mcp": {
+    "yt-dlp": {
       "command": "npx",
       "args": [
         "-y",
@@ -47,23 +45,44 @@ pip install yt-dlp
 ```
 3. Click "Save" to install the MCP server
 
+## Tool Documentation
+
+* **download_youtube_srt**
+  * Download YouTube subtitles in SRT format
+  * Inputs:
+    * `url` (string, required): URL of the YouTube video
+
+* **download_youtube_video**
+  * Download YouTube video to user's Downloads folder
+  * Inputs:
+    * `url` (string, required): URL of the YouTube video
 
 ## Usage Examples
 
 Ask your LLM to:
-- "Summarize the YouTube video <<URL>>"
-- "Download this YouTube video: <<URL>>"
+```
+"Download subtitles from this YouTube video: https://youtube.com/watch?v=..."
+"Download this YouTube video: https://youtube.com/watch?v=..."
+```
 
 ## Manual Start
 
-If needed, you can start the server manually:
+If needed, start the server manually:
 ```bash
-yt-dlp-mcp
+npx @kevinwatt/yt-dlp-mcp
 ```
 
 ## Requirements
 
-- `yt-dlp` installed and in PATH
-- Node.js 20+
-- MCP-compatible LLM service
+* Node.js 20+
+* `yt-dlp` in system PATH
+* MCP-compatible LLM service
+
+## License
+
+MIT
+
+## Author
+
+Dewei Yen
 
