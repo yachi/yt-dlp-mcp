@@ -8,7 +8,7 @@ Uses `yt-dlp` to download YouTube content and connects it to LLMs via [Model Con
 - Download YouTube videos to your Downloads folder
 - Integrates with Dive and other MCP-compatible LLMs
 
-## Installation
+## Install yt-dlp
 
 1. Install `yt-dlp` (Pip, Homebrew and WinGet both work great here)
 
@@ -27,7 +27,11 @@ Linux
 pip install yt-dlp
 ```
 
-2. Install this via [dive](https://github.com/OpenAgentPlatform/Dive):
+## Install via [Dive Desktop](https://github.com/OpenAgentPlatform/Dive):
+
+1. Click "+ Add MCP Server" in Dive Desktop
+2. Copy and paste this configuration:
+
 ```json
 {
   "mcpServers": {
@@ -41,6 +45,8 @@ pip install yt-dlp
   }
 }
 ```
+3. Click "Save" to install the MCP server
+
 
 ## Usage Examples
 
