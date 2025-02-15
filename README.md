@@ -5,7 +5,8 @@ An MCP server implementation that integrates with yt-dlp, providing YouTube cont
 ## Features
 
 * **YouTube Subtitles**: Download subtitles in SRT format for LLMs to read
-* **Video Download**: Save videos to your Downloads folder
+* **Video Download**: Save videos to your Downloads folder with resolution control
+* **Privacy-Focused**: Direct download without tracking
 * **MCP Integration**: Works with Dive and other MCP-compatible LLMs
 
 ## Installation
@@ -47,22 +48,30 @@ pip install yt-dlp
 
 ## Tool Documentation
 
+* **list_youtube_subtitles**
+  * List all available subtitles for a YouTube video
+  * Inputs:
+    * `url` (string, required): URL of the YouTube video
+
 * **download_youtube_srt**
   * Download YouTube subtitles in SRT format
   * Inputs:
     * `url` (string, required): URL of the YouTube video
+    * `language` (string, optional): Language code (e.g., 'en', 'zh-Hant', 'ja'). Defaults to 'en'
 
 * **download_youtube_video**
   * Download YouTube video to user's Downloads folder
   * Inputs:
     * `url` (string, required): URL of the YouTube video
+    * `resolution` (string, optional): Video resolution ('480p', '720p', '1080p', 'best'). Defaults to '720p'
 
 ## Usage Examples
 
 Ask your LLM to:
 ```
-"Download subtitles from this YouTube video: https://youtube.com/watch?v=..."
-"Download this YouTube video: https://youtube.com/watch?v=..."
+"List available subtitles for this video: https://youtube.com/watch?v=..."
+"Download Chinese subtitles from this video: https://youtube.com/watch?v=..."
+"Download this video in 1080p: https://youtube.com/watch?v=..."
 ```
 
 ## Manual Start
