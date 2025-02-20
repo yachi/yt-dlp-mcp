@@ -33,36 +33,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: "list_youtube_subtitles",
-        description: "List all available subtitles for a YouTube video",
+        name: "list_video_subtitles",
+        description: "List all available subtitles for a video",
         inputSchema: {
           type: "object",
           properties: {
-            url: { type: "string", description: "URL of the YouTube video" },
+            url: { type: "string", description: "URL of the video" },
           },
           required: ["url"],
         },
       },
       {
-        name: "download_youtube_srt",
-        description: "Download YouTube subtitles in SRT format. Default language is English, falls back to available languages.",
+        name: "download_video_srt",
+        description: "Download video subtitles in SRT format. Default language is English, falls back to available languages.",
         inputSchema: {
           type: "object",
           properties: {
-            url: { type: "string", description: "URL of the YouTube video" },
+            url: { type: "string", description: "URL of the video" },
             language: { type: "string", description: "Language code (e.g., 'en', 'zh-Hant', 'ja'). Optional, defaults to 'en'" },
           },
           required: ["url"],
         },
       },
       {
-        name: "download_youtube_video",
+        name: "download_video",
         description:
-          "Download YouTube video to the user's default Downloads folder (usually ~/Downloads).",
+          "Download video to the user's default Downloads folder (usually ~/Downloads).",
         inputSchema: {
           type: "object",
           properties: {
-            url: { type: "string", description: "URL of the YouTube video" },
+            url: { type: "string", description: "URL of the video" },
             resolution: { 
               type: "string", 
               description: "Video resolution (e.g., '720p', '1080p'). Optional, defaults to '720p'",
@@ -77,12 +77,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 /**
- * Lists all available subtitles for a YouTube video
- * @param url The URL of the YouTube video
+ * Lists all available subtitles for a video
+ * @param url The URL of the video
  * @returns Formatted list of available subtitles
  */
 async function listSubtitles(url: string): Promise<string> {
-  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "youtube-"));
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ytdlp-"));
   
   try {
     const result = await spawnPromise(
@@ -97,13 +97,13 @@ async function listSubtitles(url: string): Promise<string> {
 }
 
 /**
- * Downloads YouTube subtitles in specified language
- * @param url The URL of the YouTube video
+ * Downloads video subtitles in specified language
+ * @param url The URL of the video
  * @param language The language code for subtitles
  * @returns Subtitle content
  */
 async function downloadSubtitles(url: string, language: string = "en"): Promise<string> {
-  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "youtube-"));
+  const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ytdlp-"));
 
   try {
     await spawnPromise(
@@ -135,8 +135,8 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
 }
 
 /**
- * Downloads a YouTube video with specified resolution
- * @param url The URL of the YouTube video
+ * Downloads a video with specified resolution
+ * @param url The URL of the video
  * @param resolution The desired video resolution
  * @returns A detailed success message including the filename
  */
@@ -204,7 +204,7 @@ server.setRequestHandler(
       resolution?: string;
     };
 
-    if (toolName === "list_youtube_subtitles") {
+    if (toolName === "list_video_subtitles") {
       try {
         const subtitlesList = await listSubtitles(args.url);
         return {
@@ -216,7 +216,7 @@ server.setRequestHandler(
           isError: true,
         };
       }
-    } else if (toolName === "download_youtube_srt") {
+    } else if (toolName === "download_video_srt") {
       try {
         const subtitles = await downloadSubtitles(args.url, args.language);
         return {
@@ -228,7 +228,7 @@ server.setRequestHandler(
           isError: true,
         };
       }
-    } else if (toolName === "download_youtube_video") {
+    } else if (toolName === "download_video") {
       try {
         const message = await downloadVideo(args.url, args.resolution);
         return {
