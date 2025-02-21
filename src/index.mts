@@ -14,7 +14,7 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.21';
+const VERSION = '0.6.22';
 
 /**
  * System Configuration
@@ -135,6 +135,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: "Preferred video resolution. For YouTube: '480p', '720p', '1080p', 'best'. For other platforms: '480p' for low quality, '720p'/'1080p' for HD, 'best' for highest quality. Defaults to '720p'",
               enum: ["480p", "720p", "1080p", "best"]
             },
+          },
+          required: ["url"],
+        },
+      },
+      {
+        name: "download_audio",
+        description: "Download audio in best available quality (usually m4a/mp3 format) to the user's default Downloads folder (usually ~/Downloads).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "URL of the video" },
           },
           required: ["url"],
         },
@@ -461,6 +472,110 @@ export async function downloadVideo(url: string, resolution = "720p"): Promise<s
 }
 
 /**
+ * Downloads audio from video in m4a format
+ * @param url The URL of the video
+ * @returns A detailed success message including the filename
+ */
+async function downloadAudio(url: string): Promise<string> {
+  const userDownloadsDir = CONFIG.DOWNLOADS_DIR;
+  
+  try {
+    validateUrl(url);
+    const timestamp = getFormattedTimestamp();
+    
+    const outputTemplate = path.join(
+      userDownloadsDir,
+      `%(title).${CONFIG.MAX_FILENAME_LENGTH}s [%(id)s] ${timestamp}.%(ext)s`
+    );
+
+    let format: string;
+    if (isYouTubeUrl(url)) {
+      format = "140/bestaudio[ext=m4a]/bestaudio";  // 優先選擇 m4a
+    } else {
+      format = "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio";  // 優先選擇 m4a/mp3
+    }
+
+    // Get expected filename
+    let expectedFilename: string;
+    try {
+      expectedFilename = await spawnPromise("yt-dlp", [
+        "--get-filename",
+        "-f", format,
+        "--output", outputTemplate,
+        url
+      ]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Unsupported URL')) {
+        throw new VideoDownloadError(
+          ERROR_CODES.UNSUPPORTED_URL,
+          'UNSUPPORTED_URL',
+          error as Error
+        );
+      }
+      if (errorMessage.includes('not available')) {
+        throw new VideoDownloadError(
+          ERROR_CODES.VIDEO_UNAVAILABLE,
+          'VIDEO_UNAVAILABLE',
+          error as Error
+        );
+      }
+      throw new VideoDownloadError(
+        ERROR_CODES.UNKNOWN_ERROR,
+        'UNKNOWN_ERROR',
+        error as Error
+      );
+    }
+
+    expectedFilename = expectedFilename.trim();
+
+    // Download audio
+    try {
+      await spawnPromise("yt-dlp", [
+        "--progress",
+        "--newline",
+        "--no-mtime",
+        "-f", format,
+        "--output", outputTemplate,
+        url
+      ]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Permission denied')) {
+        throw new VideoDownloadError(
+          ERROR_CODES.PERMISSION_ERROR,
+          'PERMISSION_ERROR',
+          error as Error
+        );
+      }
+      if (errorMessage.includes('format not available')) {
+        throw new VideoDownloadError(
+          ERROR_CODES.FORMAT_ERROR,
+          'FORMAT_ERROR',
+          error as Error
+        );
+      }
+      throw new VideoDownloadError(
+        ERROR_CODES.UNKNOWN_ERROR,
+        'UNKNOWN_ERROR',
+        error as Error
+      );
+    }
+
+    return `Audio successfully downloaded as "${path.basename(expectedFilename)}" to ${userDownloadsDir}`;
+  } catch (error) {
+    if (error instanceof VideoDownloadError) {
+      throw error;
+    }
+    throw new VideoDownloadError(
+      ERROR_CODES.UNKNOWN_ERROR,
+      'UNKNOWN_ERROR',
+      error as Error
+    );
+  }
+}
+
+/**
  * Handle tool execution with unified error handling
  * @param action Async operation to execute
  * @param errorPrefix Error message prefix
@@ -513,6 +628,11 @@ server.setRequestHandler(
       return handleToolExecution(
         () => downloadVideo(args.url, args.resolution),
         "Error downloading video"
+      );
+    } else if (toolName === "download_audio") {
+      return handleToolExecution(
+        () => downloadAudio(args.url),
+        "Error downloading audio"
       );
     } else {
       return {
