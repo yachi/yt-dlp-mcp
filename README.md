@@ -94,6 +94,16 @@ npx @kevinwatt/yt-dlp-mcp
 * `yt-dlp` in system PATH
 * MCP-compatible LLM service
 
+
+## Documentation
+
+- [API Reference](./docs/api.md)
+- [Examples](./docs/examples.md)
+- [Configuration](./docs/configuration.md)
+- [Error Handling](./docs/error-handling.md)
+- [Contributing](./docs/contributing.md)
+
+
 ## License
 
 MIT
