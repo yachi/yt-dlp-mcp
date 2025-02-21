@@ -65,6 +65,11 @@ pip install yt-dlp
     * `url` (string, required): URL of the video
     * `resolution` (string, optional): Video resolution ('480p', '720p', '1080p', 'best'). Defaults to '720p'
 
+* **download_audio**
+  * Download audio in best available quality (usually m4a/mp3 format) to user's Downloads folder
+  * Inputs:
+    * `url` (string, required): URL of the video
+
 ## Usage Examples
 
 Ask your LLM to:
@@ -73,6 +78,7 @@ Ask your LLM to:
 "Download a video from facebook: https://facebook.com/..."
 "Download Chinese subtitles from this video: https://youtube.com/watch?v=..."
 "Download this video in 1080p: https://youtube.com/watch?v=..."
+"Download audio from this YouTube video: https://youtube.com/watch?v=..."
 ```
 
 ## Manual Start
