@@ -17,7 +17,7 @@ import { downloadVideo } from "./modules/video.js";
 import { downloadAudio } from "./modules/audio.js";
 import { listSubtitles, downloadSubtitles } from "./modules/subtitle.js";
 
-const VERSION = '0.6.24';
+const VERSION = '0.6.25';
 
 /**
  * Validate system configuration

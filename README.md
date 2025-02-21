@@ -6,6 +6,7 @@ An MCP server implementation that integrates with yt-dlp, providing video and au
 
 * **Subtitles**: Download subtitles in SRT format for LLMs to read
 * **Video Download**: Save videos to your Downloads folder with resolution control
+* **Audio Download**: Save audios to your Downloads folder
 * **Privacy-Focused**: Direct download without tracking
 * **MCP Integration**: Works with Dive and other MCP-compatible LLMs
 
@@ -98,7 +99,6 @@ npx @kevinwatt/yt-dlp-mcp
 ## Documentation
 
 - [API Reference](./docs/api.md)
-- [Examples](./docs/examples.md)
 - [Configuration](./docs/configuration.md)
 - [Error Handling](./docs/error-handling.md)
 - [Contributing](./docs/contributing.md)
