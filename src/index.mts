@@ -14,7 +14,7 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.14';
+const VERSION = '0.6.15';
 
 /**
  * System Configuration
@@ -315,19 +315,8 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
             { cwd: tempDirectory }
           );
         } catch (autoSubError) {
-          const errorMessage = autoSubError instanceof Error ? autoSubError.message : String(autoSubError);
-          if (errorMessage.includes('no subtitles')) {
-            throw new SubtitleError(
-              ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
-              'SUBTITLE_NOT_AVAILABLE',
-              autoSubError as Error
-            );
-          }
-          throw new SubtitleError(
-            ERROR_CODES.SUBTITLE_ERROR,
-            'SUBTITLE_ERROR',
-            autoSubError as Error
-          );
+          // 直接拋出 yt-dlp 的錯誤訊息
+          throw new Error(autoSubError instanceof Error ? autoSubError.message : String(autoSubError));
         }
     }
 
@@ -336,15 +325,11 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
     
     // 過濾出字幕文件（支援 .vtt 和 .srt 格式）
     const subtitleFiles = files.filter(file => 
-      file.includes(language) && 
       (file.endsWith('.vtt') || file.endsWith('.srt'))
     );
 
     if (subtitleFiles.length === 0) {
-      throw new SubtitleError(
-        ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
-        'SUBTITLE_NOT_AVAILABLE'
-      );
+      throw new Error("No subtitle files found after download");
     }
 
     // 讀取並組合字幕內容
@@ -360,10 +345,7 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
     }
 
     if (!subtitlesContent) {
-      throw new SubtitleError(
-        ERROR_CODES.SUBTITLE_ERROR,
-        'SUBTITLE_ERROR'
-      );
+      throw new Error("Failed to read subtitle content");
     }
 
     return subtitlesContent;
