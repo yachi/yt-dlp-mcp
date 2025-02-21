@@ -1,6 +1,6 @@
 # yt-dlp-mcp
 
-An MCP server implementation that integrates with yt-dlp, providing video content download capabilities (e.g. YouTube, Facebook, etc.) for LLMs.
+An MCP server implementation that integrates with yt-dlp, providing video and audio content download capabilities (e.g. YouTube, Facebook, Tiktok, etc.) for LLMs.
 
 ## Features
 
