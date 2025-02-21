@@ -14,10 +14,10 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.10';
+const VERSION = '0.6.11';
 
 /**
- * 系統配置
+ * System Configuration
  */
 const CONFIG = {
   MAX_FILENAME_LENGTH: 50,
@@ -27,16 +27,16 @@ const CONFIG = {
 } as const;
 
 /**
- * 驗證系統配置
- * @throws {Error} 當配置無效時
+ * Validate system configuration
+ * @throws {Error} when configuration is invalid
  */
 async function validateConfig(): Promise<void> {
-  // 檢查下載目錄
+  // Check downloads directory
   if (!fs.existsSync(CONFIG.DOWNLOADS_DIR)) {
     throw new Error(`Downloads directory does not exist: ${CONFIG.DOWNLOADS_DIR}`);
   }
 
-  // 檢查下載目錄權限
+  // Check downloads directory permissions
   try {
     const testFile = path.join(CONFIG.DOWNLOADS_DIR, '.write-test');
     fs.writeFileSync(testFile, '');
@@ -45,7 +45,7 @@ async function validateConfig(): Promise<void> {
     throw new Error(`No write permission in downloads directory: ${CONFIG.DOWNLOADS_DIR}`);
   }
 
-  // 檢查臨時目錄權限
+  // Check temporary directory permissions
   try {
     const testDir = fs.mkdtempSync(path.join(os.tmpdir(), CONFIG.TEMP_DIR_PREFIX));
     await safeCleanup(testDir);
@@ -55,8 +55,8 @@ async function validateConfig(): Promise<void> {
 }
 
 /**
- * 檢查必要的外部依賴
- * @throws {Error} 當依賴不滿足時
+ * Check required external dependencies
+ * @throws {Error} when dependencies are not satisfied
  */
 async function checkDependencies(): Promise<void> {
   for (const tool of CONFIG.REQUIRED_TOOLS) {
@@ -69,7 +69,7 @@ async function checkDependencies(): Promise<void> {
 }
 
 /**
- * 初始化服務
+ * Initialize service
  */
 async function initialize(): Promise<void> {
   try {
@@ -144,7 +144,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 /**
- * 自定義錯誤類型
+ * Custom error types
  */
 class VideoDownloadError extends Error {
   constructor(
@@ -165,7 +165,7 @@ class SubtitleError extends VideoDownloadError {
 }
 
 /**
- * 錯誤代碼映射
+ * Error code mappings
  */
 const ERROR_CODES = {
   UNSUPPORTED_URL: 'Unsupported or invalid URL',
@@ -180,8 +180,8 @@ const ERROR_CODES = {
 } as const;
 
 /**
- * 安全地清理臨時目錄
- * @param directory 要清理的目錄路徑
+ * Safely clean up temporary directory
+ * @param directory Directory path to clean up
  */
 async function safeCleanup(directory: string): Promise<void> {
   try {
@@ -192,9 +192,9 @@ async function safeCleanup(directory: string): Promise<void> {
 }
 
 /**
- * 驗證 URL 格式
- * @param url 要驗證的 URL
- * @throws {VideoDownloadError} 當 URL 無效時
+ * Validate URL format
+ * @param url URL to validate
+ * @throws {VideoDownloadError} when URL is invalid
  */
 function validateUrl(url: string, ErrorClass = VideoDownloadError): void {
   try {
@@ -208,8 +208,8 @@ function validateUrl(url: string, ErrorClass = VideoDownloadError): void {
 }
 
 /**
- * 生成格式化的時間戳
- * @returns 格式化的時間戳字符串
+ * Generate formatted timestamp
+ * @returns Formatted timestamp string
  */
 function getFormattedTimestamp(): string {
   return new Date().toISOString()
@@ -219,8 +219,8 @@ function getFormattedTimestamp(): string {
 }
 
 /**
- * 檢查是否為 YouTube URL
- * @param url 要檢查的 URL
+ * Check if URL is a YouTube URL
+ * @param url URL to check
  */
 function isYouTubeUrl(url: string): boolean {
   try {
@@ -288,12 +288,12 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
       );
     }
 
+    // 首先嘗試下載一般字幕
     try {
       await spawnPromise(
         "yt-dlp",
         [
           "--write-sub",
-          "--write-auto-sub",
           "--sub-lang",
           language,
           "--skip-download",
@@ -304,19 +304,36 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
         { cwd: tempDirectory }
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('no subtitles')) {
+      // 如果一般字幕下載失敗，嘗試下載自動生成的字幕
+      try {
+        await spawnPromise(
+          "yt-dlp",
+          [
+            "--write-auto-sub",
+            "--sub-lang",
+            language,
+            "--skip-download",
+            "--sub-format",
+            "srt",
+            url,
+          ],
+          { cwd: tempDirectory }
+        );
+      } catch (autoSubError) {
+        const errorMessage = autoSubError instanceof Error ? autoSubError.message : String(autoSubError);
+        if (errorMessage.includes('no subtitles')) {
+          throw new SubtitleError(
+            ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
+            'SUBTITLE_NOT_AVAILABLE',
+            autoSubError as Error
+          );
+        }
         throw new SubtitleError(
-          ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
-          'SUBTITLE_NOT_AVAILABLE',
-          error as Error
+          ERROR_CODES.SUBTITLE_ERROR,
+          'SUBTITLE_ERROR',
+          autoSubError as Error
         );
       }
-      throw new SubtitleError(
-        ERROR_CODES.SUBTITLE_ERROR,
-        'SUBTITLE_ERROR',
-        error as Error
-      );
     }
 
     let subtitlesContent = "";
@@ -328,7 +345,16 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
       );
     }
 
-    for (const file of files) {
+    // 只讀取 .srt 文件
+    const srtFiles = files.filter(file => file.endsWith('.srt'));
+    if (srtFiles.length === 0) {
+      throw new SubtitleError(
+        ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
+        'SUBTITLE_NOT_AVAILABLE'
+      );
+    }
+
+    for (const file of srtFiles) {
       const filePath = path.join(tempDirectory, file);
       try {
         const fileData = fs.readFileSync(filePath, "utf8");
@@ -485,9 +511,9 @@ export async function downloadVideo(url: string, resolution = "720p"): Promise<s
 }
 
 /**
- * 處理工具執行並統一錯誤處理
- * @param action 要執行的異步操作
- * @param errorPrefix 錯誤訊息前綴
+ * Handle tool execution with unified error handling
+ * @param action Async operation to execute
+ * @param errorPrefix Error message prefix
  */
 async function handleToolExecution<T>(
   action: () => Promise<T>,
