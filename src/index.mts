@@ -14,7 +14,7 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.12';
+const VERSION = '0.6.13';
 
 /**
  * System Configuration
@@ -234,8 +234,6 @@ function isYouTubeUrl(url: string): boolean {
 
 /**
  * Lists all available subtitles for a video
- * @param url The URL of the video
- * @returns Formatted list of available subtitles
  */
 async function listSubtitles(url: string): Promise<string> {
   const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ytdlp-"));
@@ -245,7 +243,12 @@ async function listSubtitles(url: string): Promise<string> {
 
     const result = await spawnPromise(
       "yt-dlp",
-      ["--list-subs", "--skip-download", url],
+      [
+        "--list-subs",
+        "--write-auto-sub",  // 確保也列出自動生成的字幕
+        "--skip-download",
+        url
+      ],
       { cwd: tempDirectory }
     );
     return result;
@@ -270,9 +273,6 @@ async function listSubtitles(url: string): Promise<string> {
 
 /**
  * Downloads video subtitles in specified language
- * @param url The URL of the video
- * @param language The language code for subtitles
- * @returns Subtitle content
  */
 async function downloadSubtitles(url: string, language: string = "en"): Promise<string> {
   const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ytdlp-"));
@@ -280,7 +280,6 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
   try {
     validateUrl(url, SubtitleError);
 
-    // 驗證語言代碼格式
     if (!/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$/i.test(language)) {
       throw new SubtitleError(
         ERROR_CODES.INVALID_LANGUAGE,
@@ -288,8 +287,19 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
       );
     }
 
-    // 首先嘗試下載一般字幕
-    try {
+    // 直接嘗試下載自動生成的字幕
+    await spawnPromise(
+      "yt-dlp",
+      [
+        "--write-auto-sub",
+        "--sub-lang",
+        language,
+        "--skip-download",
+        url
+      ],
+      { cwd: tempDirectory }
+    ).catch(async () => {
+      // 如果自動字幕失敗，嘗試下載一般字幕
       await spawnPromise(
         "yt-dlp",
         [
@@ -297,64 +307,45 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
           "--sub-lang",
           language,
           "--skip-download",
-          "--sub-format",
-          "srt",
-          url,
+          url
         ],
         { cwd: tempDirectory }
-      );
-    } catch (error) {
-      // 如果一般字幕下載失敗，嘗試下載自動生成的字幕
-      try {
-        await spawnPromise(
-          "yt-dlp",
-          [
-            "--write-auto-sub",
-            "--sub-lang",
-            language,
-            "--skip-download",
-            "--sub-format",
-            "srt",
-            url,
-          ],
-          { cwd: tempDirectory }
-        );
-      } catch (autoSubError) {
-        const errorMessage = autoSubError instanceof Error ? autoSubError.message : String(autoSubError);
+      ).catch((error) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         if (errorMessage.includes('no subtitles')) {
           throw new SubtitleError(
             ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
             'SUBTITLE_NOT_AVAILABLE',
-            autoSubError as Error
+            error as Error
           );
         }
         throw new SubtitleError(
           ERROR_CODES.SUBTITLE_ERROR,
           'SUBTITLE_ERROR',
-          autoSubError as Error
+          error as Error
         );
-      }
-    }
+      });
+    });
 
-    let subtitlesContent = "";
+    // 讀取下載的字幕文件
     const files = fs.readdirSync(tempDirectory);
-    if (files.length === 0) {
+    
+    // 過濾出字幕文件（支援 .vtt 和 .srt 格式）
+    const subtitleFiles = files.filter(file => 
+      file.includes(language) && 
+      (file.endsWith('.vtt') || file.endsWith('.srt'))
+    );
+
+    if (subtitleFiles.length === 0) {
       throw new SubtitleError(
         ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
         'SUBTITLE_NOT_AVAILABLE'
       );
     }
 
-    // 只讀取 .srt 文件
-    const srtFiles = files.filter(file => file.endsWith('.srt'));
-    if (srtFiles.length === 0) {
-      throw new SubtitleError(
-        ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
-        'SUBTITLE_NOT_AVAILABLE'
-      );
-    }
-
-    for (const file of srtFiles) {
+    // 讀取並組合字幕內容
+    let subtitlesContent = "";
+    for (const file of subtitleFiles) {
       const filePath = path.join(tempDirectory, file);
       try {
         const fileData = fs.readFileSync(filePath, "utf8");
