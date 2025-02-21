@@ -1,7 +1,7 @@
 {
   "name": "@kevinwatt/yt-dlp-mcp",
   "version": "0.6.21",
-  "description": "yt-dlp MCP Server - Download video content via Model Context Protocol",
+  "description": "A MCP server that bridges Video & Audio content with Large Language Models using yt-dlp.",
   "keywords": [
     "mcp",
     "youtube",
