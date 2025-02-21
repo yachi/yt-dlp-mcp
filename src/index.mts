@@ -14,7 +14,7 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.13';
+const VERSION = '0.6.14';
 
 /**
  * System Configuration
@@ -111,8 +111,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "download_video_srt",
-        description: "Download video subtitles in SRT format. Default language is English, falls back to available languages.",
+        name: "download_video_subtitles",
+        description: "Download video subtitles in any available format. Supports both regular and auto-generated subtitles.",
         inputSchema: {
           type: "object",
           properties: {
@@ -287,19 +287,8 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
       );
     }
 
-    // 直接嘗試下載自動生成的字幕
-    await spawnPromise(
-      "yt-dlp",
-      [
-        "--write-auto-sub",
-        "--sub-lang",
-        language,
-        "--skip-download",
-        url
-      ],
-      { cwd: tempDirectory }
-    ).catch(async () => {
-      // 如果自動字幕失敗，嘗試下載一般字幕
+    // 首先嘗試下載一般字幕
+    try {
       await spawnPromise(
         "yt-dlp",
         [
@@ -310,22 +299,37 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
           url
         ],
         { cwd: tempDirectory }
-      ).catch((error) => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('no subtitles')) {
+      );
+    } catch (error) {
+      // 如果一般字幕下載失敗，則嘗試下載自動生成的英文字幕
+        try {
+          await spawnPromise(
+            "yt-dlp",
+            [
+              "--write-auto-sub",
+              "--sub-lang",
+              "en",  // 強制使用英文
+              "--skip-download",
+              url
+            ],
+            { cwd: tempDirectory }
+          );
+        } catch (autoSubError) {
+          const errorMessage = autoSubError instanceof Error ? autoSubError.message : String(autoSubError);
+          if (errorMessage.includes('no subtitles')) {
+            throw new SubtitleError(
+              ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
+              'SUBTITLE_NOT_AVAILABLE',
+              autoSubError as Error
+            );
+          }
           throw new SubtitleError(
-            ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
-            'SUBTITLE_NOT_AVAILABLE',
-            error as Error
+            ERROR_CODES.SUBTITLE_ERROR,
+            'SUBTITLE_ERROR',
+            autoSubError as Error
           );
         }
-        throw new SubtitleError(
-          ERROR_CODES.SUBTITLE_ERROR,
-          'SUBTITLE_ERROR',
-          error as Error
-        );
-      });
-    });
+    }
 
     // 讀取下載的字幕文件
     const files = fs.readdirSync(tempDirectory);
@@ -545,7 +549,7 @@ server.setRequestHandler(
         () => listSubtitles(args.url),
         "Error listing subtitles"
       );
-    } else if (toolName === "download_video_srt") {
+    } else if (toolName === "download_video_subtitles") {
       return handleToolExecution(
         () => downloadSubtitles(args.url, args.language),
         "Error downloading subtitles"
