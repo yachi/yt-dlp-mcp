@@ -495,43 +495,10 @@ async function downloadAudio(url: string): Promise<string> {
       format = "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio";  // 優先選擇 m4a/mp3
     }
 
-    // Get expected filename
-    let expectedFilename: string;
-    try {
-      expectedFilename = await spawnPromise("yt-dlp", [
-        "--get-filename",
-        "-f", format,
-        "--output", outputTemplate,
-        url
-      ]);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Unsupported URL')) {
-        throw new VideoDownloadError(
-          ERROR_CODES.UNSUPPORTED_URL,
-          'UNSUPPORTED_URL',
-          error as Error
-        );
-      }
-      if (errorMessage.includes('not available')) {
-        throw new VideoDownloadError(
-          ERROR_CODES.VIDEO_UNAVAILABLE,
-          'VIDEO_UNAVAILABLE',
-          error as Error
-        );
-      }
-      throw new VideoDownloadError(
-        ERROR_CODES.UNKNOWN_ERROR,
-        'UNKNOWN_ERROR',
-        error as Error
-      );
-    }
-
-    expectedFilename = expectedFilename.trim();
-
-    // Download audio
+    // Download audio with verbose output
     try {
       await spawnPromise("yt-dlp", [
+        "--verbose",           // 添加詳細輸出
         "--progress",
         "--newline",
         "--no-mtime",
@@ -539,39 +506,23 @@ async function downloadAudio(url: string): Promise<string> {
         "--output", outputTemplate,
         url
       ]);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('Permission denied')) {
-        throw new VideoDownloadError(
-          ERROR_CODES.PERMISSION_ERROR,
-          'PERMISSION_ERROR',
-          error as Error
-        );
-      }
-      if (errorMessage.includes('format not available')) {
-        throw new VideoDownloadError(
-          ERROR_CODES.FORMAT_ERROR,
-          'FORMAT_ERROR',
-          error as Error
-        );
-      }
-      throw new VideoDownloadError(
-        ERROR_CODES.UNKNOWN_ERROR,
-        'UNKNOWN_ERROR',
-        error as Error
-      );
-    }
 
-    return `Audio successfully downloaded as "${path.basename(expectedFilename)}" to ${userDownloadsDir}`;
-  } catch (error) {
-    if (error instanceof VideoDownloadError) {
-      throw error;
+      // 如果下載成功，返回成功消息
+      const files = fs.readdirSync(userDownloadsDir);
+      const downloadedFile = files.find(file => file.includes(timestamp));
+      if (!downloadedFile) {
+        throw new Error("Download completed but file not found");
+      }
+      return `Audio successfully downloaded as "${downloadedFile}" to ${userDownloadsDir}`;
+
+    } catch (error) {
+      // 直接拋出原始錯誤信息
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`yt-dlp error: ${errorMessage}`);
     }
-    throw new VideoDownloadError(
-      ERROR_CODES.UNKNOWN_ERROR,
-      'UNKNOWN_ERROR',
-      error as Error
-    );
+  } catch (error) {
+    // 不再包裝錯誤，直接拋出
+    throw error;
   }
 }
 
