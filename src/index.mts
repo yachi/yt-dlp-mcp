@@ -14,7 +14,7 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.17';
+const VERSION = '0.6.19';
 
 /**
  * System Configuration
@@ -268,34 +268,36 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
       throw new Error('Invalid language code');
     }
 
-    // 直接嘗試下載自動生成的字幕
+    // 下載字幕，同時支援一般字幕和自動生成的字幕
     try {
-      await spawnPromise(
+      const result = await spawnPromise(
         "yt-dlp",
         [
-          "--write-auto-sub",  // 使用自動生成的字幕
-          "--sub-lang",
-          language,
+          "--write-sub",         // 嘗試下載一般字幕
+          "--write-auto-sub",    // 同時支援自動生成字幕
+          "--sub-lang", language,
+          "--convert-subs", "srt",
           "--skip-download",
           url
         ],
         { cwd: tempDirectory }
       );
+      console.log("yt-dlp output:", result);
     } catch (error) {
-      // 直接拋出 yt-dlp 的錯誤訊息
       throw error;
     }
 
     // 讀取下載的字幕文件
     const files = fs.readdirSync(tempDirectory);
+    console.log("Files in directory:", files);
     
-    // 過濾出字幕文件（支援 .vtt 和 .srt 格式）
+    // 過濾出字幕文件
     const subtitleFiles = files.filter(file => 
-      (file.endsWith('.vtt') || file.endsWith('.srt'))
+      file.endsWith('.srt')
     );
 
     if (subtitleFiles.length === 0) {
-      throw new Error("No subtitle files found after download");
+      throw new Error(`No subtitle files found. Available files: ${files.join(', ')}`);
     }
 
     // 讀取並組合字幕內容
