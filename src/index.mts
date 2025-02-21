@@ -14,7 +14,7 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.16';
+const VERSION = '0.6.17';
 
 /**
  * System Configuration
@@ -101,7 +101,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "list_video_subtitles",
-        description: "List all available subtitles for a video",
+        description: "List all available subtitles for a video, including auto-generated captions",
         inputSchema: {
           type: "object",
           properties: {
@@ -112,12 +112,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "download_video_subtitles",
-        description: "Download video subtitles in any available format. Supports both regular and auto-generated subtitles.",
+        description: "Download video subtitles in any available format. Supports both regular and auto-generated subtitles in various languages.",
         inputSchema: {
           type: "object",
           properties: {
             url: { type: "string", description: "URL of the video" },
-            language: { type: "string", description: "Language code (e.g., 'en', 'zh-Hant', 'ja'). Optional, defaults to 'en'" },
+            language: { type: "string", description: "Language code (e.g., 'en', 'zh-Hant', 'ja'). Will try to get auto-generated subtitles if regular subtitles are not available." },
           },
           required: ["url"],
         },
@@ -157,12 +157,6 @@ class VideoDownloadError extends Error {
   }
 }
 
-class SubtitleError extends VideoDownloadError {
-  constructor(message: string, code: string = 'SUBTITLE_ERROR', cause?: Error) {
-    super(message, code, cause);
-    this.name = 'SubtitleError';
-  }
-}
 
 /**
  * Error code mappings
@@ -239,35 +233,19 @@ async function listSubtitles(url: string): Promise<string> {
   const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ytdlp-"));
   
   try {
-    validateUrl(url, SubtitleError);
+    validateUrl(url);
 
-    // 列出所有字幕，包括自動生成的
+    // 同時列出一般字幕和自動生成的字幕
     const result = await spawnPromise(
       "yt-dlp",
       [
-        "--list-subs",
-        "--write-auto-sub",
+        "--list-subs",         // 列出一般字幕
+        "--write-auto-sub",    // 包含自動生成的字幕
         "--skip-download",
         url
       ],
       { cwd: tempDirectory }
     );
-
-    // 如果沒有一般字幕，再列出自動生成的字幕
-    if (result.includes('has no subtitles')) {
-      const autoSubResult = await spawnPromise(
-        "yt-dlp",
-        [
-          "--list-subs",
-          "--write-auto-sub",
-          "--skip-download",
-          url
-        ],
-        { cwd: tempDirectory }
-      );
-      return autoSubResult;
-    }
-
     return result;
   } catch (error) {
     // 直接傳遞 yt-dlp 的錯誤訊息
@@ -284,21 +262,18 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
   const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ytdlp-"));
 
   try {
-    validateUrl(url, SubtitleError);
+    validateUrl(url);
 
     if (!/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$/i.test(language)) {
-      throw new SubtitleError(
-        ERROR_CODES.INVALID_LANGUAGE,
-        'INVALID_LANGUAGE'
-      );
+      throw new Error('Invalid language code');
     }
 
-    // 首先嘗試下載一般字幕
+    // 直接嘗試下載自動生成的字幕
     try {
       await spawnPromise(
         "yt-dlp",
         [
-          "--write-sub",
+          "--write-auto-sub",  // 使用自動生成的字幕
           "--sub-lang",
           language,
           "--skip-download",
@@ -307,23 +282,8 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
         { cwd: tempDirectory }
       );
     } catch (error) {
-      // 如果一般字幕下載失敗，則嘗試下載自動生成的英文字幕
-        try {
-          await spawnPromise(
-            "yt-dlp",
-            [
-              "--write-auto-sub",
-              "--sub-lang",
-              "en",  // 強制使用英文
-              "--skip-download",
-              url
-            ],
-            { cwd: tempDirectory }
-          );
-        } catch (autoSubError) {
-          // 直接拋出 yt-dlp 的錯誤訊息
-          throw new Error(autoSubError instanceof Error ? autoSubError.message : String(autoSubError));
-        }
+      // 直接拋出 yt-dlp 的錯誤訊息
+      throw error;
     }
 
     // 讀取下載的字幕文件
