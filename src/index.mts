@@ -14,7 +14,7 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.15';
+const VERSION = '0.6.16';
 
 /**
  * System Configuration
@@ -241,31 +241,37 @@ async function listSubtitles(url: string): Promise<string> {
   try {
     validateUrl(url, SubtitleError);
 
+    // 列出所有字幕，包括自動生成的
     const result = await spawnPromise(
       "yt-dlp",
       [
         "--list-subs",
-        "--write-auto-sub",  // 確保也列出自動生成的字幕
+        "--write-auto-sub",
         "--skip-download",
         url
       ],
       { cwd: tempDirectory }
     );
+
+    // 如果沒有一般字幕，再列出自動生成的字幕
+    if (result.includes('has no subtitles')) {
+      const autoSubResult = await spawnPromise(
+        "yt-dlp",
+        [
+          "--list-subs",
+          "--write-auto-sub",
+          "--skip-download",
+          url
+        ],
+        { cwd: tempDirectory }
+      );
+      return autoSubResult;
+    }
+
     return result;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('no subtitles')) {
-      throw new SubtitleError(
-        ERROR_CODES.SUBTITLE_NOT_AVAILABLE,
-        'SUBTITLE_NOT_AVAILABLE',
-        error as Error
-      );
-    }
-    throw new SubtitleError(
-      ERROR_CODES.SUBTITLE_ERROR,
-      'SUBTITLE_ERROR',
-      error as Error
-    );
+    // 直接傳遞 yt-dlp 的錯誤訊息
+    throw error;
   } finally {
     await safeCleanup(tempDirectory);
   }
