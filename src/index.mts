@@ -14,7 +14,7 @@ import * as path from "path";
 import { spawnPromise } from "spawn-rx";
 import { rimraf } from "rimraf";
 
-const VERSION = '0.6.20';
+const VERSION = '0.6.21';
 
 /**
  * System Configuration
@@ -100,8 +100,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: "list_video_subtitles",
-        description: "List all available subtitles for a video, including auto-generated captions",
+        name: "list_subtitle_languages",
+        description: "List all available subtitle languages and their formats for a video (including auto-generated captions)",
         inputSchema: {
           type: "object",
           properties: {
@@ -242,13 +242,18 @@ async function listSubtitles(url: string): Promise<string> {
         "--list-subs",         // 列出一般字幕
         "--write-auto-sub",    // 包含自動生成的字幕
         "--skip-download",
+        "--verbose",           // 添加詳細輸出
         url
       ],
       { cwd: tempDirectory }
     );
+
+    // 如果沒有一般字幕，添加說明
+    if (result.includes("has no subtitles")) {
+      return "Regular subtitles: None\n\nAuto-generated subtitles: Available in multiple languages";
+    }
     return result;
   } catch (error) {
-    // 直接傳遞 yt-dlp 的錯誤訊息
     throw error;
   } finally {
     await safeCleanup(tempDirectory);
@@ -268,7 +273,6 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
       throw new Error('Invalid language code');
     }
 
-    // 下載字幕，同時支援一般字幕和自動生成的字幕
     try {
       const result = await spawnPromise(
         "yt-dlp",
@@ -278,6 +282,7 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
           "--sub-lang", language,
           "--convert-subs", "srt",
           "--skip-download",
+          "--verbose",           // 添加詳細輸出
           url
         ],
         { cwd: tempDirectory }
@@ -293,7 +298,7 @@ async function downloadSubtitles(url: string, language: string = "en"): Promise<
     
     // 過濾出字幕文件
     const subtitleFiles = files.filter(file => 
-      file.endsWith('.srt')
+      file.endsWith('.srt') || file.endsWith('.vtt')
     );
 
     if (subtitleFiles.length === 0) {
@@ -494,10 +499,10 @@ server.setRequestHandler(
       resolution?: string;
     };
 
-    if (toolName === "list_video_subtitles") {
+    if (toolName === "list_subtitle_languages") {
       return handleToolExecution(
         () => listSubtitles(args.url),
-        "Error listing subtitles"
+        "Error listing subtitle languages"
       );
     } else if (toolName === "download_video_subtitles") {
       return handleToolExecution(

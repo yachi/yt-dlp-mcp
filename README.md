@@ -48,13 +48,13 @@ pip install yt-dlp
 
 ## Tool Documentation
 
-* **list_video_subtitles**
-  * List all available subtitles for a video
+* **list_subtitle_languages**
+  * List all available subtitle languages and their formats for a video (including auto-generated captions)
   * Inputs:
     * `url` (string, required): URL of the video
 
-* **download_video_srt**
-  * Download subtitles in SRT format
+* **download_video_subtitles**
+  * Download video subtitles in any available format. Supports both regular and auto-generated subtitles
   * Inputs:
     * `url` (string, required): URL of the video
     * `language` (string, optional): Language code (e.g., 'en', 'zh-Hant', 'ja'). Defaults to 'en'
@@ -95,4 +95,5 @@ MIT
 ## Author
 
 Dewei Yen
+
 

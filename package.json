@@ -1,6 +1,6 @@
 {
   "name": "@kevinwatt/yt-dlp-mcp",
-  "version": "0.6.20",
+  "version": "0.6.21",
   "description": "yt-dlp MCP Server - Download video content via Model Context Protocol",
   "keywords": [
     "mcp",
