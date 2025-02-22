@@ -5,7 +5,8 @@ import {
   _spawnPromise, 
   validateUrl, 
   getFormattedTimestamp, 
-  isYouTubeUrl 
+  isYouTubeUrl,
+  generateRandomFilename 
 } from "./utils.js";
 
 /**
@@ -76,27 +77,30 @@ export async function downloadVideo(
           format = "bestvideo[height>=720]+bestaudio/best[height>=720]/best";
       }
     }
-    
-    // 使用安全的文件名模板
-    const outputTemplate = path.join(
-      userDownloadsDir,
-      sanitizeFilename(`%(title)s [%(id)s] ${timestamp}`, config.file) + '.%(ext)s'
-    );
 
-    // Get expected filename
+    let outputTemplate: string;
     let expectedFilename: string;
+    
     try {
+      // 嘗試獲取檔案名稱
+      outputTemplate = path.join(
+        userDownloadsDir,
+        sanitizeFilename(`%(title)s [%(id)s] ${timestamp}`, config.file) + '.%(ext)s'
+      );
+      
       expectedFilename = await _spawnPromise("yt-dlp", [
         "--get-filename",
         "-f", format,
         "--output", outputTemplate,
         url
       ]);
+      expectedFilename = expectedFilename.trim();
     } catch (error) {
-      throw new Error(`Failed to get filename: ${error instanceof Error ? error.message : String(error)}`);
+      // 如果無法獲取檔案名稱，使用隨機檔案名
+      const randomFilename = generateRandomFilename('mp4');
+      outputTemplate = path.join(userDownloadsDir, randomFilename);
+      expectedFilename = randomFilename;
     }
-
-    expectedFilename = expectedFilename.trim();
     
     // Download with progress info
     try {

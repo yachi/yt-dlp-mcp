@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import { spawn } from 'child_process';
+import { randomBytes } from 'crypto';
 
 /**
  * Validates if a given string is a valid URL.
@@ -126,4 +127,22 @@ export function getFormattedTimestamp(): string {
     .replace(/[:.]/g, '-')
     .replace('T', '_')
     .split('.')[0];
+}
+
+/**
+ * Generates a random filename with timestamp prefix.
+ * 
+ * @param extension - Optional file extension (default: 'mp4')
+ * @returns A random filename with timestamp
+ * 
+ * @example
+ * ```typescript
+ * const filename = generateRandomFilename('mp3');
+ * console.log(filename); // '2024-03-20_12-30-00_a1b2c3d4.mp3'
+ * ```
+ */
+export function generateRandomFilename(extension: string = 'mp4'): string {
+  const timestamp = getFormattedTimestamp();
+  const randomId = randomBytes(4).toString('hex');
+  return `${timestamp}_${randomId}.${extension}`;
 } 
