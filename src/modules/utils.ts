@@ -145,4 +145,39 @@ export function generateRandomFilename(extension: string = 'mp4'): string {
   const timestamp = getFormattedTimestamp();
   const randomId = randomBytes(4).toString('hex');
   return `${timestamp}_${randomId}.${extension}`;
+}
+
+/**
+ * Cleans SRT subtitle content to produce a plain text transcript.
+ * Removes timestamps, sequence numbers, and HTML tags.
+ * 
+ * @param srtContent - Raw SRT subtitle content
+ * @returns Cleaned transcript text
+ * 
+ * @example
+ * ```typescript
+ * const cleanedText = cleanSubtitleToTranscript(srtContent);
+ * console.log(cleanedText); // 'Hello world this is a transcript...'
+ * ```
+ */
+export function cleanSubtitleToTranscript(srtContent: string): string {
+  return srtContent
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim();
+      // Remove empty lines
+      if (!trimmed) return false;
+      // Remove sequence numbers (lines that are just digits)
+      if (/^\d+$/.test(trimmed)) return false;
+      // Remove timestamp lines
+      if (/^\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}$/.test(trimmed)) return false;
+      return true;
+    })
+    .map(line => {
+      // Remove HTML tags
+      return line.replace(/<[^>]*>/g, '');
+    })
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 } 
