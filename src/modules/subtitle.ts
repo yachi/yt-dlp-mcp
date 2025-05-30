@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import type { Config } from '../config.js';
-import { _spawnPromise, validateUrl } from "./utils.js";
+import { _spawnPromise, validateUrl, cleanSubtitleToTranscript } from "./utils.js";
 
 /**
  * Lists all available subtitles for a video.
@@ -102,6 +102,67 @@ export async function downloadSubtitles(
     }
 
     return output;
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Downloads and cleans subtitles to produce a plain text transcript.
+ * 
+ * @param url - The URL of the video
+ * @param language - Language code (e.g., 'en', 'zh-Hant', 'ja')
+ * @param config - Configuration object
+ * @returns Promise resolving to the cleaned transcript text
+ * @throws {Error} When URL is invalid, language is not available, or download fails
+ * 
+ * @example
+ * ```typescript
+ * try {
+ *   const transcript = await downloadTranscript('https://youtube.com/watch?v=...', 'en', config);
+ *   console.log('Transcript:', transcript);
+ * } catch (error) {
+ *   console.error('Failed to download transcript:', error);
+ * }
+ * ```
+ */
+export async function downloadTranscript(
+  url: string,
+  language: string,
+  config: Config
+): Promise<string> {
+  if (!validateUrl(url)) {
+    throw new Error('Invalid or unsupported URL format');
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), config.file.tempDirPrefix));
+
+  try {
+    await _spawnPromise('yt-dlp', [
+      '--skip-download',
+      '--write-subs',
+      '--write-auto-subs',
+      '--sub-lang', language,
+      '--sub-format', 'ttml',
+      '--convert-subs', 'srt',
+      '--output', path.join(tempDir, 'transcript.%(ext)s'),
+      url
+    ]);
+
+    const srtFiles = fs.readdirSync(tempDir)
+      .filter(file => file.endsWith('.srt'));
+
+    if (srtFiles.length === 0) {
+      throw new Error('No subtitle files found for transcript generation');
+    }
+
+    let transcriptContent = '';
+    for (const file of srtFiles) {
+      const srtContent = fs.readFileSync(path.join(tempDir, file), 'utf8');
+      transcriptContent += cleanSubtitleToTranscript(srtContent) + ' ';
+    }
+
+    return transcriptContent.trim();
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
