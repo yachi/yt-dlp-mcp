@@ -15,7 +15,7 @@ import { CONFIG } from "./config.js";
 import { _spawnPromise, safeCleanup } from "./modules/utils.js";
 import { downloadVideo } from "./modules/video.js";
 import { downloadAudio } from "./modules/audio.js";
-import { listSubtitles, downloadSubtitles, downloadTranscript } from "./modules/subtitle.js";
+import { listSubtitles, downloadSubtitles } from "./modules/subtitle.js";
 
 const VERSION = '0.6.26';
 
@@ -148,18 +148,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["url"],
         },
       },
-      {
-        name: "download_transcript",
-        description: "Download and clean video subtitles to produce a plain text transcript without timestamps or formatting.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            url: { type: "string", description: "URL of the video" },
-            language: { type: "string", description: "Language code (e.g., 'en', 'zh-Hant', 'ja'). Defaults to 'en'" },
-          },
-          required: ["url"],
-        },
-      },
     ],
   };
 });
@@ -222,11 +210,6 @@ server.setRequestHandler(
       return handleToolExecution(
         () => downloadAudio(args.url, CONFIG),
         "Error downloading audio"
-      );
-    } else if (toolName === "download_transcript") {
-      return handleToolExecution(
-        () => downloadTranscript(args.url, args.language || CONFIG.download.defaultSubtitleLanguage, CONFIG),
-        "Error downloading transcript"
       );
     } else {
       return {
