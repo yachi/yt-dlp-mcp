@@ -71,6 +71,12 @@ pip install yt-dlp
   * Inputs:
     * `url` (string, required): URL of the video
 
+* **download_transcript**
+  * Download and clean video subtitles to produce a plain text transcript without timestamps or formatting
+  * Inputs:
+    * `url` (string, required): URL of the video
+    * `language` (string, optional): Language code (e.g., 'en', 'zh-Hant', 'ja'). Defaults to 'en'
+
 ## Usage Examples
 
 Ask your LLM to:
@@ -80,6 +86,8 @@ Ask your LLM to:
 "Download Chinese subtitles from this video: https://youtube.com/watch?v=..."
 "Download this video in 1080p: https://youtube.com/watch?v=..."
 "Download audio from this YouTube video: https://youtube.com/watch?v=..."
+"Get a clean transcript of this video: https://youtube.com/watch?v=..."
+"Download Spanish transcript from this video: https://youtube.com/watch?v=..."
 ```
 
 ## Manual Start
