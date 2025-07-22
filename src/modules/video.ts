@@ -11,19 +11,21 @@ import {
 
 /**
  * Downloads a video from the specified URL.
- * 
+ *
  * @param url - The URL of the video to download
  * @param config - Configuration object for download settings
  * @param resolution - Preferred video resolution ('480p', '720p', '1080p', 'best')
+ * @param startTime - Optional start time for trimming (format: HH:MM:SS[.ms])
+ * @param endTime - Optional end time for trimming (format: HH:MM:SS[.ms])
  * @returns Promise resolving to a success message with the downloaded file path
  * @throws {Error} When URL is invalid or download fails
- * 
+ *
  * @example
  * ```typescript
  * // Download with default settings
  * const result = await downloadVideo('https://youtube.com/watch?v=...');
  * console.log(result);
- * 
+ *
  * // Download with specific resolution
  * const hdResult = await downloadVideo(
  *   'https://youtube.com/watch?v=...',
@@ -31,12 +33,24 @@ import {
  *   '1080p'
  * );
  * console.log(hdResult);
+ *
+ * // Download with trimming
+ * const trimmedResult = await downloadVideo(
+ *   'https://youtube.com/watch?v=...',
+ *   undefined,
+ *   '720p',
+ *   '00:01:30',
+ *   '00:02:45'
+ * );
+ * console.log(trimmedResult);
  * ```
  */
 export async function downloadVideo(
   url: string,
   config: Config,
-  resolution: "480p" | "720p" | "1080p" | "best" = "720p"
+  resolution: "480p" | "720p" | "1080p" | "best" = "720p",
+  startTime?: string,
+  endTime?: string
 ): Promise<string> {
   const userDownloadsDir = config.file.downloadsDir;
 
@@ -103,17 +117,36 @@ export async function downloadVideo(
       expectedFilename = randomFilename;
     }
 
+    // Build download arguments
+    const downloadArgs = [
+      "--ignore-config",
+      "--progress",
+      "--newline",
+      "--no-mtime",
+      "-f", format,
+      "--output", outputTemplate
+    ];
+
+    // Add trimming parameters if provided
+    if (startTime || endTime) {
+      let downloadSection = "*";
+      
+      if (startTime && endTime) {
+        downloadSection = `*${startTime}-${endTime}`;
+      } else if (startTime) {
+        downloadSection = `*${startTime}-`;
+      } else if (endTime) {
+        downloadSection = `*-${endTime}`;
+      }
+
+      downloadArgs.push("--download-sections", downloadSection, "--force-keyframes-at-cuts");
+    }
+
+    downloadArgs.push(url);
+
     // Download with progress info
     try {
-      await _spawnPromise("yt-dlp", [
-        "--ignore-config",
-        "--progress",
-        "--newline",
-        "--no-mtime",
-        "-f", format,
-        "--output", outputTemplate,
-        url
-      ]);
+      await _spawnPromise("yt-dlp", downloadArgs);
     } catch (error) {
       throw new Error(`Download failed: ${error instanceof Error ? error.message : String(error)}`);
     }
