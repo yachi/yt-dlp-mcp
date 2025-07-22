@@ -65,6 +65,8 @@ pip install yt-dlp
   * Inputs:
     * `url` (string, required): URL of the video
     * `resolution` (string, optional): Video resolution ('480p', '720p', '1080p', 'best'). Defaults to '720p'
+    * `startTime` (string, optional): Start time for trimming (format: HH:MM:SS[.ms]) - e.g., '00:01:30' or '00:01:30.500'
+    * `endTime` (string, optional): End time for trimming (format: HH:MM:SS[.ms]) - e.g., '00:02:45' or '00:02:45.500'
 
 * **download_audio**
   * Download audio in best available quality (usually m4a/mp3 format) to user's Downloads folder
