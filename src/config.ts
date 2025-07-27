@@ -6,31 +6,31 @@ type DeepPartial<T> = {
 };
 
 /**
- * 配置類型定義
+ * Configuration type definitions
  */
 export interface Config {
-  // 文件相關配置
+  // File-related configuration
   file: {
     maxFilenameLength: number;
     downloadsDir: string;
     tempDirPrefix: string;
-    // 文件名處理相關配置
+    // Filename processing configuration
     sanitize: {
-      // 替換非法字符為此字符
+      // Character to replace illegal characters
       replaceChar: string;
-      // 文件名截斷時的後綴
+      // Suffix when truncating filenames
       truncateSuffix: string;
-      // 非法字符正則表達式
+      // Regular expression for illegal characters
       illegalChars: RegExp;
-      // 保留字列表
+      // List of reserved names
       reservedNames: readonly string[];
     };
   };
-  // 工具相關配置
+  // Tool-related configuration
   tools: {
     required: readonly string[];
   };
-  // 下載相關配置
+  // Download-related configuration
   download: {
     defaultResolution: "480p" | "720p" | "1080p" | "best";
     defaultAudioFormat: "m4a" | "mp3";
@@ -39,7 +39,7 @@ export interface Config {
 }
 
 /**
- * 默認配置
+ * Default configuration
  */
 const defaultConfig: Config = {
   file: {
@@ -49,7 +49,7 @@ const defaultConfig: Config = {
     sanitize: {
       replaceChar: '_',
       truncateSuffix: '...',
-      illegalChars: /[<>:"/\\|?*\x00-\x1F]/g,  // Windows 非法字符
+      illegalChars: /[<>:"/\\|?*\x00-\x1F]/g,  // Windows illegal characters
       reservedNames: [
         'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4',
         'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2',
@@ -68,12 +68,12 @@ const defaultConfig: Config = {
 };
 
 /**
- * 從環境變數加載配置
+ * Load configuration from environment variables
  */
 function loadEnvConfig(): DeepPartial<Config> {
   const envConfig: DeepPartial<Config> = {};
 
-  // 文件配置
+  // File configuration
   const fileConfig: DeepPartial<Config['file']> = {
     sanitize: {
       replaceChar: process.env.YTDLP_SANITIZE_REPLACE_CHAR,
@@ -97,7 +97,7 @@ function loadEnvConfig(): DeepPartial<Config> {
     envConfig.file = fileConfig;
   }
 
-  // 下載配置
+  // Download configuration
   const downloadConfig: Partial<Config['download']> = {};
   if (process.env.YTDLP_DEFAULT_RESOLUTION && 
       ['480p', '720p', '1080p', 'best'].includes(process.env.YTDLP_DEFAULT_RESOLUTION)) {
@@ -118,42 +118,42 @@ function loadEnvConfig(): DeepPartial<Config> {
 }
 
 /**
- * 驗證配置
+ * Validate configuration
  */
 function validateConfig(config: Config): void {
-  // 驗證文件名長度
+  // Validate filename length
   if (config.file.maxFilenameLength < 5) {
     throw new Error('maxFilenameLength must be at least 5');
   }
 
-  // 驗證下載目錄
+  // Validate downloads directory
   if (!config.file.downloadsDir) {
     throw new Error('downloadsDir must be specified');
   }
 
-  // 驗證臨時目錄前綴
+  // Validate temporary directory prefix
   if (!config.file.tempDirPrefix) {
     throw new Error('tempDirPrefix must be specified');
   }
 
-  // 驗證默認分辨率
+  // Validate default resolution
   if (!['480p', '720p', '1080p', 'best'].includes(config.download.defaultResolution)) {
     throw new Error('Invalid defaultResolution');
   }
 
-  // 驗證默認音頻格式
+  // Validate default audio format
   if (!['m4a', 'mp3'].includes(config.download.defaultAudioFormat)) {
     throw new Error('Invalid defaultAudioFormat');
   }
 
-  // 驗證默認字幕語言
+  // Validate default subtitle language
   if (!/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$/i.test(config.download.defaultSubtitleLanguage)) {
     throw new Error('Invalid defaultSubtitleLanguage');
   }
 }
 
 /**
- * 合併配置
+ * Merge configuration
  */
 function mergeConfig(base: Config, override: DeepPartial<Config>): Config {
   return {
@@ -180,7 +180,7 @@ function mergeConfig(base: Config, override: DeepPartial<Config>): Config {
 }
 
 /**
- * 加載配置
+ * Load configuration
  */
 export function loadConfig(): Config {
   const envConfig = loadEnvConfig();
@@ -190,19 +190,19 @@ export function loadConfig(): Config {
 }
 
 /**
- * 安全的文件名處理函數
+ * Safe filename processing function
  */
 export function sanitizeFilename(filename: string, config: Config['file']): string {
-  // 移除非法字符
+  // Remove illegal characters
   let safe = filename.replace(config.sanitize.illegalChars, config.sanitize.replaceChar);
   
-  // 檢查保留字
+  // Check reserved names
   const basename = path.parse(safe).name.toUpperCase();
   if (config.sanitize.reservedNames.includes(basename)) {
     safe = `_${safe}`;
   }
   
-  // 處理長度限制
+  // Handle length limitation
   if (safe.length > config.maxFilenameLength) {
     const ext = path.extname(safe);
     const name = safe.slice(0, config.maxFilenameLength - ext.length - config.sanitize.truncateSuffix.length);
@@ -212,5 +212,5 @@ export function sanitizeFilename(filename: string, config: Config['file']): stri
   return safe;
 }
 
-// 導出當前配置實例
+// Export current configuration instance
 export const CONFIG = loadConfig(); 

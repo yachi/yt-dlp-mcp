@@ -16,8 +16,9 @@ import { _spawnPromise, safeCleanup } from "./modules/utils.js";
 import { downloadVideo } from "./modules/video.js";
 import { downloadAudio } from "./modules/audio.js";
 import { listSubtitles, downloadSubtitles, downloadTranscript } from "./modules/subtitle.js";
+import { searchVideos } from "./modules/search.js";
 
-const VERSION = '0.6.26';
+const VERSION = '0.6.27';
 
 /**
  * Validate system configuration
@@ -97,6 +98,23 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
+      {
+        name: "search_videos",
+        description: "Search for videos on YouTube using keywords. Returns title, uploader, duration, and URL for each result.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search keywords or phrase" },
+            maxResults: { 
+              type: "number", 
+              description: "Maximum number of results to return (1-50, default: 10)",
+              minimum: 1,
+              maximum: 50
+            },
+          },
+          required: ["query"],
+        },
+      },
       {
         name: "list_subtitle_languages",
         description: "List all available subtitle languages and their formats for a video (including auto-generated captions)",
@@ -211,9 +229,16 @@ server.setRequestHandler(
       resolution?: string;
       startTime?: string;
       endTime?: string;
+      query?: string;
+      maxResults?: number;
     };
 
-    if (toolName === "list_subtitle_languages") {
+    if (toolName === "search_videos") {
+      return handleToolExecution(
+        () => searchVideos(args.query!, args.maxResults || 10, CONFIG),
+        "Error searching videos"
+      );
+    } else if (toolName === "list_subtitle_languages") {
       return handleToolExecution(
         () => listSubtitles(args.url),
         "Error listing subtitle languages"

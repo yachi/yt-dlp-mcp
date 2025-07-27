@@ -49,6 +49,12 @@ pip install yt-dlp
 
 ## Tool Documentation
 
+* **search_videos**
+  * Search for videos on YouTube using keywords
+  * Inputs:
+    * `query` (string, required): Search keywords or phrase
+    * `maxResults` (number, optional): Maximum number of results to return (1-50, default: 10)
+
 * **list_subtitle_languages**
   * List all available subtitle languages and their formats for a video (including auto-generated captions)
   * Inputs:
@@ -83,6 +89,9 @@ pip install yt-dlp
 
 Ask your LLM to:
 ```
+"Search for Python tutorial videos"
+"Find JavaScript courses and show me the top 5 results"
+"Search for machine learning tutorials with 15 results"
 "List available subtitles for this video: https://youtube.com/watch?v=..."
 "Download a video from facebook: https://facebook.com/..."
 "Download Chinese subtitles from this video: https://youtube.com/watch?v=..."
