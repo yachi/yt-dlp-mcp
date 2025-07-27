@@ -2,14 +2,16 @@
 
 ## Video Operations
 
-### downloadVideo(url: string, config?: Config, resolution?: string): Promise<string>
+### downloadVideo(url: string, config?: Config, resolution?: string, startTime?: string, endTime?: string): Promise<string>
 
-Downloads a video from the specified URL.
+Downloads a video from the specified URL with optional trimming.
 
 **Parameters:**
 - `url`: The URL of the video to download
 - `config`: (Optional) Configuration object
 - `resolution`: (Optional) Preferred video resolution ('480p', '720p', '1080p', 'best')
+- `startTime`: (Optional) Start time for trimming (format: HH:MM:SS[.ms])
+- `endTime`: (Optional) End time for trimming (format: HH:MM:SS[.ms])
 
 **Returns:**
 - Promise resolving to a success message with the downloaded file path
@@ -29,6 +31,26 @@ const hdResult = await downloadVideo(
   '1080p'
 );
 console.log(hdResult);
+
+// Download with trimming
+const trimmedResult = await downloadVideo(
+  'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+  undefined,
+  '720p',
+  '00:01:30',
+  '00:02:45'
+);
+console.log(trimmedResult);
+
+// Download with fractional seconds
+const preciseTrim = await downloadVideo(
+  'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+  undefined,
+  '720p',
+  '00:01:30.500',
+  '00:02:45.250'
+);
+console.log(preciseTrim);
 ```
 
 ## Audio Operations

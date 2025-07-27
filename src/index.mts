@@ -128,10 +128,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             url: { type: "string", description: "URL of the video" },
-            resolution: { 
-              type: "string", 
+            resolution: {
+              type: "string",
               description: "Preferred video resolution. For YouTube: '480p', '720p', '1080p', 'best'. For other platforms: '480p' for low quality, '720p'/'1080p' for HD, 'best' for highest quality. Defaults to '720p'",
               enum: ["480p", "720p", "1080p", "best"]
+            },
+            startTime: {
+              type: "string",
+              description: "Start time for trimming (format: HH:MM:SS[.ms]) - e.g., '00:01:30' or '00:01:30.500'"
+            },
+            endTime: {
+              type: "string",
+              description: "End time for trimming (format: HH:MM:SS[.ms]) - e.g., '00:02:45' or '00:02:45.500'"
             },
           },
           required: ["url"],
@@ -197,10 +205,12 @@ server.setRequestHandler(
   CallToolRequestSchema,
   async (request: CallToolRequest) => {
     const toolName = request.params.name;
-    const args = request.params.arguments as { 
+    const args = request.params.arguments as {
       url: string;
       language?: string;
       resolution?: string;
+      startTime?: string;
+      endTime?: string;
     };
 
     if (toolName === "list_subtitle_languages") {
@@ -215,7 +225,13 @@ server.setRequestHandler(
       );
     } else if (toolName === "download_video") {
       return handleToolExecution(
-        () => downloadVideo(args.url, CONFIG, args.resolution as "480p" | "720p" | "1080p" | "best"),
+        () => downloadVideo(
+          args.url,
+          CONFIG,
+          args.resolution as "480p" | "720p" | "1080p" | "best",
+          args.startTime,
+          args.endTime
+        ),
         "Error downloading video"
       );
     } else if (toolName === "download_audio") {
