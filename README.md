@@ -4,9 +4,11 @@ An MCP server implementation that integrates with yt-dlp, providing video and au
 
 ## Features
 
+* **Video Metadata**: Extract comprehensive video information without downloading content
 * **Subtitles**: Download subtitles in SRT format for LLMs to read
 * **Video Download**: Save videos to your Downloads folder with resolution control
 * **Audio Download**: Save audios to your Downloads folder
+* **Video Search**: Search for videos on YouTube using keywords
 * **Privacy-Focused**: Direct download without tracking
 * **MCP Integration**: Works with Dive and other MCP-compatible LLMs
 
@@ -85,6 +87,19 @@ pip install yt-dlp
     * `url` (string, required): URL of the video
     * `language` (string, optional): Language code (e.g., 'en', 'zh-Hant', 'ja'). Defaults to 'en'
 
+* **get_video_metadata**
+  * Extract comprehensive video metadata without downloading the content
+  * Returns detailed information including title, description, channel, timestamps, view counts, and more
+  * Inputs:
+    * `url` (string, required): URL of the video
+    * `fields` (array, optional): Specific metadata fields to extract (e.g., ['id', 'title', 'description', 'channel']). If not provided, returns all available metadata
+
+* **get_video_metadata_summary**
+  * Get a human-readable summary of key video metadata
+  * Returns formatted text with title, channel, duration, views, upload date, and description preview
+  * Inputs:
+    * `url` (string, required): URL of the video
+
 ## Usage Examples
 
 Ask your LLM to:
@@ -99,6 +114,10 @@ Ask your LLM to:
 "Download audio from this YouTube video: https://youtube.com/watch?v=..."
 "Get a clean transcript of this video: https://youtube.com/watch?v=..."
 "Download Spanish transcript from this video: https://youtube.com/watch?v=..."
+"Get metadata for this video: https://youtube.com/watch?v=..."
+"Show me the title, description, and channel info for this video: https://youtube.com/watch?v=..."
+"Get a summary of this video's metadata: https://youtube.com/watch?v=..."
+"Extract just the id, title, and view count from this video: https://youtube.com/watch?v=..."
 ```
 
 ## Manual Start

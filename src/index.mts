@@ -17,8 +17,9 @@ import { downloadVideo } from "./modules/video.js";
 import { downloadAudio } from "./modules/audio.js";
 import { listSubtitles, downloadSubtitles, downloadTranscript } from "./modules/subtitle.js";
 import { searchVideos } from "./modules/search.js";
+import { getVideoMetadata, getVideoMetadataSummary } from "./modules/metadata.js";
 
-const VERSION = '0.6.27';
+const VERSION = '0.6.28';
 
 /**
  * Validate system configuration
@@ -186,6 +187,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["url"],
         },
       },
+      {
+        name: "get_video_metadata",
+        description: "Extract comprehensive video metadata without downloading the content. Returns detailed information including title, description, channel, timestamps, view counts, and more.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "URL of the video" },
+            fields: { 
+              type: "array",
+              items: { type: "string" },
+              description: "Optional: Specific metadata fields to extract (e.g., ['id', 'title', 'description', 'channel']). If not provided, returns all available metadata."
+            },
+          },
+          required: ["url"],
+        },
+      },
+      {
+        name: "get_video_metadata_summary",
+        description: "Get a human-readable summary of key video metadata including title, channel, duration, views, upload date, and description preview.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "URL of the video" },
+          },
+          required: ["url"],
+        },
+      },
     ],
   };
 });
@@ -231,6 +259,7 @@ server.setRequestHandler(
       endTime?: string;
       query?: string;
       maxResults?: number;
+      fields?: string[];
     };
 
     if (toolName === "search_videos") {
@@ -268,6 +297,16 @@ server.setRequestHandler(
       return handleToolExecution(
         () => downloadTranscript(args.url, args.language || CONFIG.download.defaultSubtitleLanguage, CONFIG),
         "Error downloading transcript"
+      );
+    } else if (toolName === "get_video_metadata") {
+      return handleToolExecution(
+        () => getVideoMetadata(args.url, args.fields, CONFIG),
+        "Error extracting video metadata"
+      );
+    } else if (toolName === "get_video_metadata_summary") {
+      return handleToolExecution(
+        () => getVideoMetadataSummary(args.url, CONFIG),
+        "Error generating video metadata summary"
       );
     } else {
       return {

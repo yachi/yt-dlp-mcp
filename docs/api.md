@@ -116,6 +116,53 @@ const subtitles = await downloadSubtitles(
 console.log(subtitles);
 ```
 
+## Metadata Operations
+
+### getVideoMetadata(url: string, fields?: string[]): Promise<string>
+
+Extract comprehensive video metadata using yt-dlp without downloading the content.
+
+**Parameters:**
+- `url`: The URL of the video to extract metadata from
+- `fields`: (Optional) Specific metadata fields to extract (e.g., `['id', 'title', 'description', 'channel']`). If omitted, returns all available metadata. If provided as an empty array `[]`, returns `{}`.
+
+**Returns:**
+- Promise resolving to a JSON string of metadata (pretty-printed)
+
+**Example:**
+```javascript
+import { getVideoMetadata } from '@kevinwatt/yt-dlp-mcp';
+
+// Get all metadata
+const all = await getVideoMetadata('https://www.youtube.com/watch?v=jNQXAC9IVRw');
+console.log(all);
+
+// Get specific fields only
+const subset = await getVideoMetadata(
+  'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+  ['id', 'title', 'description', 'channel']
+);
+console.log(subset);
+```
+
+### getVideoMetadataSummary(url: string): Promise<string>
+
+Get a human-readable summary of key video metadata fields.
+
+**Parameters:**
+- `url`: The URL of the video
+
+**Returns:**
+- Promise resolving to a formatted text summary (title, channel, duration, views, upload date, description preview, etc.)
+
+**Example:**
+```javascript
+import { getVideoMetadataSummary } from '@kevinwatt/yt-dlp-mcp';
+
+const summary = await getVideoMetadataSummary('https://www.youtube.com/watch?v=jNQXAC9IVRw');
+console.log(summary);
+```
+
 ## Configuration
 
 ### Config Interface
