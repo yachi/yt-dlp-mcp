@@ -148,7 +148,19 @@ export async function downloadVideo(
     try {
       await _spawnPromise("yt-dlp", downloadArgs);
     } catch (error) {
-      throw new Error(`Download failed: ${error instanceof Error ? error.message : String(error)}`);
+      if (error instanceof Error) {
+        if (error.message.includes("Unsupported URL") || error.message.includes("extractor")) {
+          throw new Error(`Unsupported platform or video URL: ${url}. Ensure the URL is from a supported platform.`);
+        }
+        if (error.message.includes("Video unavailable") || error.message.includes("private")) {
+          throw new Error(`Video is unavailable or private: ${url}. Check the URL and video privacy settings.`);
+        }
+        if (error.message.includes("network") || error.message.includes("Connection")) {
+          throw new Error("Network error during download. Check your internet connection and retry.");
+        }
+        throw new Error(`Download failed: ${error.message}. Check URL and try again.`);
+      }
+      throw new Error(`Download failed: ${String(error)}`);
     }
 
     return `Video successfully downloaded as "${path.basename(expectedFilename)}" to ${userDownloadsDir}`;

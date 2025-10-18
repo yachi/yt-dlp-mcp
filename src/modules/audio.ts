@@ -58,10 +58,21 @@ export async function downloadAudio(url: string, config: Config): Promise<string
     const files = readdirSync(config.file.downloadsDir);
     const downloadedFile = files.find(file => file.includes(timestamp));
     if (!downloadedFile) {
-      throw new Error("Download completed but file not found");
+      throw new Error("Download completed but file not found. Check Downloads folder permissions.");
     }
     return `Audio successfully downloaded as "${downloadedFile}" to ${config.file.downloadsDir}`;
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes("Unsupported URL") || error.message.includes("extractor")) {
+        throw new Error(`Unsupported platform or video URL: ${url}. Ensure the URL is from a supported platform.`);
+      }
+      if (error.message.includes("Video unavailable") || error.message.includes("private")) {
+        throw new Error(`Video is unavailable or private: ${url}. Check the URL and video privacy settings.`);
+      }
+      if (error.message.includes("network") || error.message.includes("Connection")) {
+        throw new Error("Network error during audio extraction. Check your internet connection and retry.");
+      }
+    }
     throw error;
   }
 } 

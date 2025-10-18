@@ -23,7 +23,7 @@ import { _spawnPromise, validateUrl, cleanSubtitleToTranscript } from "./utils.j
  */
 export async function listSubtitles(url: string): Promise<string> {
   if (!validateUrl(url)) {
-    throw new Error('Invalid or unsupported URL format');
+    throw new Error('Invalid or unsupported URL format. Please provide a valid video URL (e.g., https://youtube.com/watch?v=...)');
   }
 
   try {
@@ -37,6 +37,17 @@ export async function listSubtitles(url: string): Promise<string> {
     ]);
     return output;
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes("Unsupported URL") || error.message.includes("not supported")) {
+        throw new Error(`Unsupported platform or video URL: ${url}. Ensure the URL is from a supported platform like YouTube.`);
+      }
+      if (error.message.includes("Video unavailable") || error.message.includes("private")) {
+        throw new Error(`Video is unavailable or private: ${url}. Check the URL and video privacy settings.`);
+      }
+      if (error.message.includes("network") || error.message.includes("Connection")) {
+        throw new Error("Network error while fetching subtitles. Check your internet connection and retry.");
+      }
+    }
     throw error;
   }
 }
@@ -75,7 +86,7 @@ export async function downloadSubtitles(
   config: Config
 ): Promise<string> {
   if (!validateUrl(url)) {
-    throw new Error('Invalid or unsupported URL format');
+    throw new Error('Invalid or unsupported URL format. Please provide a valid video URL (e.g., https://youtube.com/watch?v=...)');
   }
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), config.file.tempDirPrefix));
@@ -95,7 +106,7 @@ export async function downloadSubtitles(
       .filter(file => file.endsWith('.vtt'));
 
     if (subtitleFiles.length === 0) {
-      throw new Error('No subtitle files found');
+      throw new Error(`No subtitle files found for language '${language}'. Use ytdlp_list_subtitle_languages to check available options.`);
     }
 
     let output = '';
@@ -103,7 +114,26 @@ export async function downloadSubtitles(
       output += fs.readFileSync(path.join(tempDir, file), 'utf8');
     }
 
+    // Check character limit
+    if (output.length > config.limits.characterLimit) {
+      output = output.substring(0, config.limits.characterLimit);
+      output += "\n\n⚠️ Subtitle content truncated due to size. Consider using ytdlp_download_transcript for plain text.";
+    }
+
     return output;
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes("Unsupported URL") || error.message.includes("not supported")) {
+        throw new Error(`Unsupported platform or video URL: ${url}. Ensure the URL is from a supported platform like YouTube.`);
+      }
+      if (error.message.includes("Video unavailable") || error.message.includes("private")) {
+        throw new Error(`Video is unavailable or private: ${url}. Check the URL and video privacy settings.`);
+      }
+      if (error.message.includes("network") || error.message.includes("Connection")) {
+        throw new Error("Network error while downloading subtitles. Check your internet connection and retry.");
+      }
+    }
+    throw error;
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -134,7 +164,7 @@ export async function downloadTranscript(
   config: Config
 ): Promise<string> {
   if (!validateUrl(url)) {
-    throw new Error('Invalid or unsupported URL format');
+    throw new Error('Invalid or unsupported URL format. Please provide a valid video URL (e.g., https://youtube.com/watch?v=...)');
   }
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), config.file.tempDirPrefix));
@@ -156,7 +186,7 @@ export async function downloadTranscript(
       .filter(file => file.endsWith('.srt'));
 
     if (srtFiles.length === 0) {
-      throw new Error('No subtitle files found for transcript generation');
+      throw new Error(`No subtitle files found for transcript generation in language '${language}'. Use ytdlp_list_subtitle_languages to check available options.`);
     }
 
     let transcriptContent = '';
@@ -165,7 +195,28 @@ export async function downloadTranscript(
       transcriptContent += cleanSubtitleToTranscript(srtContent) + ' ';
     }
 
-    return transcriptContent.trim();
+    transcriptContent = transcriptContent.trim();
+
+    // Transcripts can be larger than standard limit
+    if (transcriptContent.length > config.limits.maxTranscriptLength) {
+      const truncated = transcriptContent.substring(0, config.limits.maxTranscriptLength);
+      transcriptContent = truncated + "\n\n⚠️ Transcript truncated due to length. This is a partial transcript.";
+    }
+
+    return transcriptContent;
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes("Unsupported URL") || error.message.includes("not supported")) {
+        throw new Error(`Unsupported platform or video URL: ${url}. Ensure the URL is from a supported platform like YouTube.`);
+      }
+      if (error.message.includes("Video unavailable") || error.message.includes("private")) {
+        throw new Error(`Video is unavailable or private: ${url}. Check the URL and video privacy settings.`);
+      }
+      if (error.message.includes("network") || error.message.includes("Connection")) {
+        throw new Error("Network error while downloading transcript. Check your internet connection and retry.");
+      }
+    }
+    throw error;
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

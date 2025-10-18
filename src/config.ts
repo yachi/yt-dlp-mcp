@@ -36,6 +36,11 @@ export interface Config {
     defaultAudioFormat: "m4a" | "mp3";
     defaultSubtitleLanguage: string;
   };
+  // Response limits
+  limits: {
+    characterLimit: number;
+    maxTranscriptLength: number;
+  };
 }
 
 /**
@@ -64,6 +69,10 @@ const defaultConfig: Config = {
     defaultResolution: "720p",
     defaultAudioFormat: "m4a",
     defaultSubtitleLanguage: "en"
+  },
+  limits: {
+    characterLimit: 25000,      // Standard MCP character limit
+    maxTranscriptLength: 50000  // Transcripts can be larger
   }
 };
 
@@ -175,6 +184,10 @@ function mergeConfig(base: Config, override: DeepPartial<Config>): Config {
       defaultResolution: override.download?.defaultResolution || base.download.defaultResolution,
       defaultAudioFormat: override.download?.defaultAudioFormat || base.download.defaultAudioFormat,
       defaultSubtitleLanguage: override.download?.defaultSubtitleLanguage || base.download.defaultSubtitleLanguage
+    },
+    limits: {
+      characterLimit: override.limits?.characterLimit || base.limits.characterLimit,
+      maxTranscriptLength: override.limits?.maxTranscriptLength || base.limits.maxTranscriptLength
     }
   };
 }

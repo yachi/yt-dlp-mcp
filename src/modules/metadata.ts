@@ -162,37 +162,75 @@ export async function getVideoMetadata(
   try {
     // Execute yt-dlp to get metadata
     const output = await _spawnPromise("yt-dlp", args);
-    
+
     // Parse the JSON output
     const metadata: VideoMetadata = JSON.parse(output);
-    
+
     // If specific fields are requested, filter the metadata
     if (fields !== undefined && fields.length >= 0) {
-      const filteredMetadata: Partial<VideoMetadata> = {};
-      
+      const filteredMetadata: Partial<VideoMetadata> & { _truncated?: boolean; _message?: string } = {};
+
       for (const field of fields) {
         if (metadata.hasOwnProperty(field)) {
           filteredMetadata[field as keyof VideoMetadata] = metadata[field as keyof VideoMetadata];
         }
       }
-      
-      return JSON.stringify(filteredMetadata, null, 2);
+
+      let result = JSON.stringify(filteredMetadata, null, 2);
+
+      // Check character limit
+      if (_config && result.length > _config.limits.characterLimit) {
+        // Add truncation info inside JSON before truncating
+        filteredMetadata._truncated = true;
+        filteredMetadata._message = "Response truncated. Specify fewer fields to see complete data.";
+        result = JSON.stringify(filteredMetadata, null, 2);
+
+        // If still too long, truncate the string content
+        if (result.length > _config.limits.characterLimit) {
+          result = result.substring(0, _config.limits.characterLimit) + '\n... }';
+        }
+      }
+
+      return result;
     }
-    
+
     // Return formatted JSON string with all metadata
-    return JSON.stringify(metadata, null, 2);
-    
+    let result = JSON.stringify(metadata, null, 2);
+
+    // Check character limit for full metadata
+    if (_config && result.length > _config.limits.characterLimit) {
+      // Try to return essential fields only
+      const essentialFields = ['id', 'title', 'description', 'channel', 'channel_id', 'uploader',
+                               'duration', 'duration_string', 'view_count', 'like_count',
+                               'upload_date', 'tags', 'categories', 'webpage_url'];
+      const essentialMetadata: Partial<VideoMetadata> & { _truncated?: boolean; _message?: string } = {};
+
+      for (const field of essentialFields) {
+        if (metadata.hasOwnProperty(field)) {
+          essentialMetadata[field as keyof VideoMetadata] = metadata[field as keyof VideoMetadata];
+        }
+      }
+
+      // Add truncation info inside the JSON object
+      essentialMetadata._truncated = true;
+      essentialMetadata._message = 'Full metadata truncated to essential fields. Use the "fields" parameter to request specific fields.';
+
+      result = JSON.stringify(essentialMetadata, null, 2);
+    }
+
+    return result;
+
   } catch (error) {
     if (error instanceof Error) {
-      // Handle common yt-dlp errors
-      if (error.message.includes("Video unavailable")) {
-        throw new Error(`Video is unavailable or private: ${url}`);
-      } else if (error.message.includes("Unsupported URL")) {
-        throw new Error(`Unsupported URL or extractor not found: ${url}`);
-      } else if (error.message.includes("network")) {
-        throw new Error(`Network error while extracting metadata: ${error.message}`);
+      // Handle common yt-dlp errors with actionable messages
+      if (error.message.includes("Video unavailable") || error.message.includes("private")) {
+        throw new Error(`Video is unavailable or private: ${url}. Check the URL and video privacy settings.`);
+      } else if (error.message.includes("Unsupported URL") || error.message.includes("extractor")) {
+        throw new Error(`Unsupported platform or video URL: ${url}. Ensure the URL is from a supported platform like YouTube.`);
+      } else if (error.message.includes("network") || error.message.includes("Connection")) {
+        throw new Error("Network error while extracting metadata. Check your internet connection and retry.");
       } else {
-        throw new Error(`Failed to extract video metadata: ${error.message}`);
+        throw new Error(`Failed to extract video metadata: ${error.message}. Verify the URL is correct.`);
       }
     }
     throw new Error(`Failed to extract video metadata from ${url}`);
@@ -225,12 +263,13 @@ export async function getVideoMetadataSummary(
   url: string,
   _config?: Config
 ): Promise<string> {
-  // Get the full metadata first
-  const metadataJson = await getVideoMetadata(url, undefined, _config);
-  const metadata: VideoMetadata = JSON.parse(metadataJson);
-  
-  // Format key fields into a readable summary
-  const lines: string[] = [];
+  try {
+    // Get the full metadata first
+    const metadataJson = await getVideoMetadata(url, undefined, _config);
+    const metadata: VideoMetadata = JSON.parse(metadataJson);
+
+    // Format key fields into a readable summary
+    const lines: string[] = [];
   
   if (metadata.title) {
     lines.push(`Title: ${metadata.title}`);
@@ -285,11 +324,18 @@ export async function getVideoMetadataSummary(
   
   if (metadata.description) {
     // Truncate description to first 200 characters
-    const desc = metadata.description.length > 200 
+    const desc = metadata.description.length > 200
       ? metadata.description.substring(0, 200) + '...'
       : metadata.description;
     lines.push(`Description: ${desc}`);
   }
-  
+
   return lines.join('\n');
+  } catch (error) {
+    // Re-throw errors from getVideoMetadata with context
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`Failed to generate metadata summary for ${url}`);
+  }
 }
