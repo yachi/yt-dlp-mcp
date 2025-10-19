@@ -50,7 +50,8 @@ RUN npm ci --omit=dev --ignore-scripts && \
 
 # Copy built application from builder
 COPY --chown=ytdlp:ytdlp --from=builder /app/lib ./lib
-COPY --chown=ytdlp:ytdlp --from=builder /app/docs ./docs
+
+# Copy README for reference
 COPY --chown=ytdlp:ytdlp README.md ./
 
 # Create downloads directory
