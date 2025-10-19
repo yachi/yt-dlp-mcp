@@ -37,7 +37,7 @@ import type { CallToolRequest, JSONRPCMessage } from "@modelcontextprotocol/sdk/
 import { z } from "zod";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
-import { randomUUID } from "crypto";
+import { randomUUID, timingSafeEqual } from "crypto";
 
 import * as os from "os";
 import * as fs from "fs";
@@ -52,13 +52,13 @@ import { getVideoMetadata, getVideoMetadataSummary } from "./modules/metadata.js
 
 const VERSION = '0.7.0';
 
-// Server configuration
-const PORT = parseInt(process.env.YTDLP_HTTP_PORT || '3000', 10);
+// Server configuration with validation
+const PORT = Math.max(1, Math.min(65535, parseInt(process.env.YTDLP_HTTP_PORT || '3000', 10)));
 const HOST = process.env.YTDLP_HTTP_HOST || '0.0.0.0';
 const API_KEY = process.env.YTDLP_API_KEY;
 const CORS_ORIGIN = process.env.YTDLP_CORS_ORIGIN || '*';
-const RATE_LIMIT = parseInt(process.env.YTDLP_RATE_LIMIT || '60', 10);
-const SESSION_TIMEOUT = parseInt(process.env.YTDLP_SESSION_TIMEOUT || '3600000', 10);
+const RATE_LIMIT = Math.max(1, parseInt(process.env.YTDLP_RATE_LIMIT || '60', 10));
+const SESSION_TIMEOUT = Math.max(60000, parseInt(process.env.YTDLP_SESSION_TIMEOUT || '3600000', 10));
 
 // Type for transport management
 interface TransportEntry {
@@ -77,15 +77,19 @@ const transports = new Map<string, TransportEntry>();
  */
 class SimpleEventStore implements EventStore {
   private events = new Map<StreamId, Array<{ eventId: EventId; message: JSONRPCMessage }>>();
-  private eventIdCounter = 0;
 
   async storeEvent(streamId: StreamId, message: JSONRPCMessage): Promise<EventId> {
     if (!this.events.has(streamId)) {
       this.events.set(streamId, []);
     }
-    const eventId = `event-${++this.eventIdCounter}`;
+    // Use timestamp + UUID for unique event IDs across restarts
+    const eventId = `${Date.now()}-${randomUUID()}`;
     this.events.get(streamId)!.push({ eventId, message });
     return eventId;
+  }
+
+  async deleteSession(streamId: StreamId): Promise<void> {
+    this.events.delete(streamId);
   }
 
   async replayEventsAfter(
@@ -139,22 +143,26 @@ function checkRateLimit(sessionId: string): boolean {
 /**
  * Cleanup expired sessions
  */
-function cleanupExpiredSessions(): void {
+async function cleanupExpiredSessions(): Promise<void> {
   const now = Date.now();
   for (const [sessionId, entry] of transports.entries()) {
     if (now - entry.created > SESSION_TIMEOUT) {
       console.log(`Cleaning up expired session: ${sessionId}`);
+
+      // Clean up event store to prevent memory leak
+      const eventStore = (entry.transport as any)._eventStore as SimpleEventStore | undefined;
+      if (eventStore?.deleteSession) {
+        await eventStore.deleteSession(sessionId);
+      }
+
       entry.transport.close();
       transports.delete(sessionId);
     }
   }
 }
 
-// Run cleanup every 5 minutes
-setInterval(cleanupExpiredSessions, 5 * 60 * 1000);
-
 /**
- * Validate API key if configured
+ * Validate API key if configured (uses constant-time comparison to prevent timing attacks)
  */
 function validateApiKey(req: Request): boolean {
   if (!API_KEY) return true;
@@ -163,7 +171,18 @@ function validateApiKey(req: Request): boolean {
   if (!authHeader) return false;
 
   const token = authHeader.replace(/^Bearer\s+/i, '');
-  return token === API_KEY;
+
+  // Constant-time comparison to prevent timing attacks
+  if (token.length !== API_KEY.length) return false;
+
+  try {
+    return timingSafeEqual(
+      Buffer.from(token),
+      Buffer.from(API_KEY)
+    );
+  } catch {
+    return false;
+  }
 }
 
 // Zod Schemas for Input Validation
@@ -445,6 +464,9 @@ async function startServer() {
 
   const app = express();
 
+  // Configure body parser with explicit size limit
+  app.use(express.json({ limit: '4mb' }));
+
   // Configure CORS
   app.use(cors({
     origin: CORS_ORIGIN,
@@ -466,19 +488,31 @@ async function startServer() {
     next();
   });
 
-  // Health check endpoint
-  app.get('/health', (_req: Request, res: Response) => {
-    res.json({
-      status: 'ok',
-      version: VERSION,
-      sessions: transports.size,
-    });
+  // Health check endpoint with yt-dlp availability check
+  app.get('/health', async (_req: Request, res: Response) => {
+    try {
+      // Check if yt-dlp is available
+      await _spawnPromise('yt-dlp', ['--version']);
+      res.json({
+        status: 'ok',
+        version: VERSION,
+        sessions: transports.size,
+      });
+    } catch (error) {
+      res.status(503).json({
+        status: 'unhealthy',
+        reason: 'yt-dlp not available',
+        sessions: transports.size,
+      });
+    }
   });
 
   // MCP endpoint with Streamable HTTP transport
   app.all('/mcp', async (req: Request, res: Response) => {
+    let sessionId: string | undefined;
+
     try {
-      const sessionId = req.query.sessionId as string | undefined;
+      sessionId = req.query.sessionId as string | undefined;
 
       // Check rate limit
       if (sessionId && !checkRateLimit(sessionId)) {
@@ -518,8 +552,25 @@ async function startServer() {
         console.log(`Created new session: ${newSessionId}`);
       }
 
-      // Handle request via transport
-      await entry.transport.handleRequest(req as any, res as any, req.body);
+      // Handle request via transport with error boundary
+      try {
+        await entry.transport.handleRequest(req as any, res as any, req.body);
+      } catch (transportError) {
+        console.error('Transport error:', transportError);
+
+        // Only send response if headers not already sent
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32603,
+              message: 'Transport error',
+              data: transportError instanceof Error ? transportError.message : String(transportError)
+            },
+            id: null
+          });
+        }
+      }
 
     } catch (error) {
       console.error('Error handling request:', error);
@@ -538,7 +589,19 @@ async function startServer() {
   });
 
   // Start listening
-  const server = app.listen(PORT, HOST, () => {
+  const httpServer = app.listen(PORT, HOST, () => {
+    // Configure timeouts for long-running downloads
+    httpServer.timeout = 10 * 60 * 1000; // 10 minutes
+    httpServer.keepAliveTimeout = 65000; // Slightly longer than default
+    httpServer.headersTimeout = 66000; // Slightly longer than keepAliveTimeout
+
+    // Start cleanup interval after server is ready
+    setInterval(() => {
+      cleanupExpiredSessions().catch(err =>
+        console.error('Error during session cleanup:', err)
+      );
+    }, 5 * 60 * 1000);
+
     console.log(`
 ╔════════════════════════════════════════════════╗
 ║  🎬 yt-dlp-mcp HTTP Server                    ║
@@ -561,21 +624,41 @@ async function startServer() {
     }
   });
 
-  // Graceful shutdown
-  process.on('SIGINT', () => {
+  // Graceful shutdown with timeout
+  process.on('SIGINT', async () => {
     console.log('\n\nShutting down gracefully...');
 
-    // Close all transports
+    // Close all transports with cleanup
+    const closePromises = [];
     for (const [sessionId, entry] of transports.entries()) {
       console.log(`Closing session: ${sessionId}`);
+
+      const eventStore = (entry.transport as any)._eventStore as SimpleEventStore | undefined;
+      if (eventStore?.deleteSession) {
+        closePromises.push(eventStore.deleteSession(sessionId));
+      }
+
       entry.transport.close();
     }
+
+    // Wait for cleanup to complete (with timeout)
+    await Promise.race([
+      Promise.all(closePromises),
+      new Promise(resolve => setTimeout(resolve, 5000))
+    ]);
+
     transports.clear();
 
-    server.close(() => {
+    httpServer.close(() => {
       console.log('Server closed');
       process.exit(0);
     });
+
+    // Force exit after 10 seconds if server doesn't close
+    setTimeout(() => {
+      console.error('Forced shutdown after timeout');
+      process.exit(1);
+    }, 10000);
   });
 }
 
