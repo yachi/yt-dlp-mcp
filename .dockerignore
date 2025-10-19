@@ -59,7 +59,6 @@ temp/
 .prettierrc*
 .eslintrc*
 jest.config.*
-tsconfig.json
 
 # Package manager files
 package-lock.json
