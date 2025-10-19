@@ -11,9 +11,9 @@ const timestampField = z.string().regex(/^\d{2}:\d{2}:\d{2}(\.\d{1,3})?$/);
 
 export const SearchVideosSchema = z.object({
   query: z.string().min(1).max(200),
-  maxResults: z.number().int().min(1).max(50).default(10),
-  offset: z.number().int().min(0).default(0),
-  response_format: z.enum(["json", "markdown"]).default("markdown"),
+  maxResults: z.number().int().min(1).max(50).default(10).optional(),
+  offset: z.number().int().min(0).default(0).optional(),
+  response_format: z.enum(["json", "markdown"]).default("markdown").optional(),
 }).strict();
 
 export const ListSubtitleLanguagesSchema = z.object({
