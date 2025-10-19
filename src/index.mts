@@ -215,7 +215,7 @@ Error Handling:
   - Returns "No videos found" if search is empty
   - Network errors: Check internet connection and retry
   - Rate limits: Wait before searching again`,
-        inputSchema: SearchVideosSchema,
+        inputSchema: z.toJSONSchema(SearchVideosSchema) as any,
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -244,7 +244,7 @@ Don't use when: You want to download subtitles (use ytdlp_download_video_subtitl
 Error Handling:
   - "Invalid or unsupported URL format" for malformed URLs
   - "No subtitle files found" if video has no subtitles`,
-        inputSchema: ListSubtitleLanguagesSchema,
+        inputSchema: z.toJSONSchema(ListSubtitleLanguagesSchema) as any,
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -275,7 +275,7 @@ Error Handling:
   - "Invalid or unsupported URL format" for bad URLs
   - "No subtitle files found" if language is unavailable
   - Use ytdlp_list_subtitle_languages first to check available options`,
-        inputSchema: DownloadVideoSubtitlesSchema,
+        inputSchema: z.toJSONSchema(DownloadVideoSubtitlesSchema) as any,
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -308,7 +308,7 @@ Note: This creates/modifies local files. YouTube has different format handling t
 Error Handling:
   - "Download failed" with details if network errors or invalid URL
   - Check Downloads folder write permissions if saves fail`,
-        inputSchema: DownloadVideoSchema,
+        inputSchema: z.toJSONSchema(DownloadVideoSchema) as any,
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,
@@ -340,7 +340,7 @@ Error Handling:
   - "Download completed but file not found" if unexpected file naming
   - Check Downloads folder write permissions if saves fail
   - Network errors will show detailed messages`,
-        inputSchema: DownloadAudioSchema,
+        inputSchema: z.toJSONSchema(DownloadAudioSchema) as any,
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,
@@ -372,7 +372,7 @@ Error Handling:
   - "Invalid or unsupported URL format" for bad URLs
   - "No subtitle files found for transcript generation" if language unavailable
   - Use ytdlp_list_subtitle_languages to check options first`,
-        inputSchema: DownloadTranscriptSchema,
+        inputSchema: z.toJSONSchema(DownloadTranscriptSchema) as any,
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -408,7 +408,7 @@ Error Handling:
   - "Video is unavailable or private" for inaccessible content
   - "Unsupported URL or extractor not found" for unsupported platforms
   - "Network error" with details for connectivity issues`,
-        inputSchema: GetVideoMetadataSchema,
+        inputSchema: z.toJSONSchema(GetVideoMetadataSchema) as any,
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -440,7 +440,7 @@ Don't use when: You need complete structured data (use ytdlp_get_video_metadata 
 
 Error Handling:
   - Same as ytdlp_get_video_metadata (unavailable videos, unsupported URLs, network errors)`,
-        inputSchema: GetVideoMetadataSummarySchema,
+        inputSchema: z.toJSONSchema(GetVideoMetadataSummarySchema) as any,
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
