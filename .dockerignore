@@ -60,7 +60,6 @@ temp/
 .eslintrc*
 jest.config.*
 
-# Package manager files
-package-lock.json
+# Package manager files (keep package-lock.json for npm ci)
 yarn.lock
 pnpm-lock.yaml
