@@ -1,0 +1,67 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+lib/
+dist/
+build/
+*.tsbuildinfo
+
+# Test files
+src/__tests__/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+coverage/
+.nyc_output/
+
+# Development files
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+azure-pipelines.yml
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# Development tools
+.editorconfig
+.prettierrc*
+.eslintrc*
+jest.config.*
+tsconfig.json
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
