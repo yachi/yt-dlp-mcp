@@ -41,11 +41,11 @@ RUN addgroup -g 1001 -S ytdlp && \
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files for production dependencies
 COPY --chown=ytdlp:ytdlp package*.json ./
 
-# Install production dependencies only
-RUN npm ci --omit=dev && \
+# Install production dependencies only (ignore scripts since we're copying pre-built files)
+RUN npm ci --omit=dev --ignore-scripts && \
     npm cache clean --force
 
 # Copy built application from builder
