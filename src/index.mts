@@ -39,14 +39,17 @@ const SearchVideosSchema = z.object({
     .min(1, "Must return at least 1 result")
     .max(50, "Cannot exceed 50 results")
     .default(10)
+    .optional()
     .describe("Maximum number of results to return (1-50)"),
   offset: z.number()
     .int("Must be a whole number")
     .min(0, "Cannot be negative")
     .default(0)
+    .optional()
     .describe("Number of results to skip for pagination"),
   response_format: z.nativeEnum(ResponseFormat)
     .default(ResponseFormat.MARKDOWN)
+    .optional()
     .describe("Output format: 'json' for structured data, 'markdown' for human-readable"),
 }).strict();
 
