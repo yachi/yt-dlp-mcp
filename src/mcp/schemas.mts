@@ -14,38 +14,38 @@ export const SearchVideosSchema = z.object({
   maxResults: z.number().int().min(1).max(50).default(10).optional(),
   offset: z.number().int().min(0).default(0).optional(),
   response_format: z.enum(["json", "markdown"]).default("markdown").optional(),
-}).strict();
+}).passthrough();
 
 export const ListSubtitleLanguagesSchema = z.object({
   url: urlField,
-}).strict();
+}).passthrough();
 
 export const DownloadVideoSubtitlesSchema = z.object({
   url: urlField,
   language: languageField.optional(),
-}).strict();
+}).passthrough();
 
 export const DownloadVideoSchema = z.object({
   url: urlField,
   resolution: z.enum(["480p", "720p", "1080p", "best"]).optional(),
   startTime: timestampField.optional(),
   endTime: timestampField.optional(),
-}).strict();
+}).passthrough();
 
 export const DownloadAudioSchema = z.object({
   url: urlField,
-}).strict();
+}).passthrough();
 
 export const DownloadTranscriptSchema = z.object({
   url: urlField,
   language: languageField.optional(),
-}).strict();
+}).passthrough();
 
 export const GetVideoMetadataSchema = z.object({
   url: urlField,
   fields: z.array(z.string()).optional(),
-}).strict();
+}).passthrough();
 
 export const GetVideoMetadataSummarySchema = z.object({
   url: urlField,
-}).strict();
+}).passthrough();
