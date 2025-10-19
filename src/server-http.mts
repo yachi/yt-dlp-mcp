@@ -27,12 +27,13 @@
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StreamableHTTPServerTransport, InMemoryEventStore } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { EventStore, EventId, StreamId } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import type { CallToolRequest } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolRequest, JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
@@ -70,6 +71,44 @@ interface TransportEntry {
 
 // Session storage
 const transports = new Map<string, TransportEntry>();
+
+/**
+ * Simple in-memory event store for session resumability
+ */
+class SimpleEventStore implements EventStore {
+  private events = new Map<StreamId, Array<{ eventId: EventId; message: JSONRPCMessage }>>();
+  private eventIdCounter = 0;
+
+  async storeEvent(streamId: StreamId, message: JSONRPCMessage): Promise<EventId> {
+    if (!this.events.has(streamId)) {
+      this.events.set(streamId, []);
+    }
+    const eventId = `event-${++this.eventIdCounter}`;
+    this.events.get(streamId)!.push({ eventId, message });
+    return eventId;
+  }
+
+  async replayEventsAfter(
+    lastEventId: EventId,
+    { send }: { send: (eventId: EventId, message: JSONRPCMessage) => Promise<void> }
+  ): Promise<StreamId> {
+    // Find the stream containing this event ID
+    for (const [streamId, streamEvents] of this.events.entries()) {
+      const index = streamEvents.findIndex(e => e.eventId === lastEventId);
+      if (index >= 0) {
+        // Replay all events after the given event ID
+        const eventsToReplay = streamEvents.slice(index + 1);
+        for (const { eventId, message } of eventsToReplay) {
+          await send(eventId, message);
+        }
+        return streamId;
+      }
+    }
+    // If event ID not found, return first stream or empty
+    const firstStream = this.events.keys().next().value;
+    return firstStream || '';
+  }
+}
 
 /**
  * Simple rate limiting per session
@@ -128,11 +167,6 @@ function validateApiKey(req: Request): boolean {
 }
 
 // Zod Schemas for Input Validation
-const ResponseFormat = {
-  JSON: "json",
-  MARKDOWN: "markdown"
-} as const;
-
 const SearchVideosSchema = z.object({
   query: z.string().min(1).max(200),
   maxResults: z.number().int().min(1).max(50).default(10),
@@ -433,7 +467,7 @@ async function startServer() {
   });
 
   // Health check endpoint
-  app.get('/health', (req: Request, res: Response) => {
+  app.get('/health', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
       version: VERSION,
@@ -461,7 +495,7 @@ async function startServer() {
       // Create new session if needed
       if (!entry) {
         const newSessionId = randomUUID();
-        const eventStore = new InMemoryEventStore();
+        const eventStore = new SimpleEventStore();
 
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => newSessionId,
