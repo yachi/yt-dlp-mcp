@@ -24,6 +24,7 @@
  *   YTDLP_CORS_ORIGIN - CORS allowed origin (default: *)
  *   YTDLP_RATE_LIMIT - Max requests per minute per session (default: 60)
  *   YTDLP_SESSION_TIMEOUT - Session timeout in ms (default: 3600000 = 1 hour)
+ *   YTDLP_STATELESS - Enable stateless mode (default: false)
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -31,7 +32,9 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { EventStore, EventId, StreamId } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
-  ListToolsRequestSchema
+  ListToolsRequestSchema,
+  ErrorCode,
+  isInitializeRequest
 } from "@modelcontextprotocol/sdk/types.js";
 import type { CallToolRequest, JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -59,6 +62,7 @@ const API_KEY = process.env.YTDLP_API_KEY;
 const CORS_ORIGIN = process.env.YTDLP_CORS_ORIGIN || '*';
 const RATE_LIMIT = Math.max(1, parseInt(process.env.YTDLP_RATE_LIMIT || '60', 10));
 const SESSION_TIMEOUT = Math.max(60000, parseInt(process.env.YTDLP_SESSION_TIMEOUT || '3600000', 10));
+const STATELESS = process.env.YTDLP_STATELESS === 'true';
 
 // Type for transport management
 interface TransportEntry {
@@ -78,12 +82,26 @@ const transports = new Map<string, TransportEntry>();
 class SimpleEventStore implements EventStore {
   private events = new Map<StreamId, Array<{ eventId: EventId; message: JSONRPCMessage }>>();
 
+  /**
+   * Generates a unique event ID that includes the stream ID for efficient lookup
+   */
+  private generateEventId(streamId: StreamId): EventId {
+    return `${streamId}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+  }
+
+  /**
+   * Extracts stream ID from an event ID
+   */
+  private getStreamIdFromEventId(eventId: EventId): StreamId {
+    const parts = eventId.split('_');
+    return parts.length > 0 ? parts[0] : '';
+  }
+
   async storeEvent(streamId: StreamId, message: JSONRPCMessage): Promise<EventId> {
     if (!this.events.has(streamId)) {
       this.events.set(streamId, []);
     }
-    // Use timestamp + UUID for unique event IDs across restarts
-    const eventId = `${Date.now()}-${randomUUID()}`;
+    const eventId = this.generateEventId(streamId);
     this.events.get(streamId)!.push({ eventId, message });
     return eventId;
   }
@@ -96,21 +114,28 @@ class SimpleEventStore implements EventStore {
     lastEventId: EventId,
     { send }: { send: (eventId: EventId, message: JSONRPCMessage) => Promise<void> }
   ): Promise<StreamId> {
-    // Find the stream containing this event ID
-    for (const [streamId, streamEvents] of this.events.entries()) {
-      const index = streamEvents.findIndex(e => e.eventId === lastEventId);
-      if (index >= 0) {
-        // Replay all events after the given event ID
-        const eventsToReplay = streamEvents.slice(index + 1);
-        for (const { eventId, message } of eventsToReplay) {
-          await send(eventId, message);
-        }
-        return streamId;
+    if (!lastEventId) {
+      return '';
+    }
+
+    // Extract stream ID from event ID for efficient lookup
+    const streamId = this.getStreamIdFromEventId(lastEventId);
+    if (!streamId || !this.events.has(streamId)) {
+      return '';
+    }
+
+    const streamEvents = this.events.get(streamId)!;
+    const index = streamEvents.findIndex(e => e.eventId === lastEventId);
+
+    if (index >= 0) {
+      // Replay all events after the given event ID
+      const eventsToReplay = streamEvents.slice(index + 1);
+      for (const { eventId, message } of eventsToReplay) {
+        await send(eventId, message);
       }
     }
-    // If event ID not found, return first stream or empty
-    const firstStream = this.events.keys().next().value;
-    return firstStream || '';
+
+    return streamId;
   }
 }
 
@@ -507,82 +532,268 @@ async function startServer() {
     }
   });
 
-  // MCP endpoint with Streamable HTTP transport
-  app.all('/mcp', async (req: Request, res: Response) => {
-    let sessionId: string | undefined;
+  // MCP POST endpoint - Handle JSON-RPC messages
+  app.post('/mcp', async (req: Request, res: Response) => {
+    const requestId = req?.body?.id;
 
     try {
-      sessionId = req.query.sessionId as string | undefined;
-
-      // Check rate limit
-      if (sessionId && !checkRateLimit(sessionId)) {
-        res.status(429).json({
-          jsonrpc: '2.0',
-          error: { code: -32000, message: 'Rate limit exceeded' },
-          id: null
-        });
-        return;
-      }
+      // Extract session ID from header (MCP spec compliant)
+      const sessionId = Array.isArray(req.headers['mcp-session-id'])
+        ? req.headers['mcp-session-id'][0]
+        : req.headers['mcp-session-id'];
 
       let entry = sessionId ? transports.get(sessionId) : undefined;
 
-      // Create new session if needed
-      if (!entry) {
-        const newSessionId = randomUUID();
-        const eventStore = new SimpleEventStore();
-
+      // Handle stateless mode
+      if (STATELESS) {
         const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => newSessionId,
-          enableJsonResponse: false,
-          eventStore,
+          sessionIdGenerator: undefined, // undefined = stateless
+          enableJsonResponse: true,
         });
 
         const server = createMcpServer();
         await server.connect(transport);
 
-        entry = {
-          transport,
-          server,
-          created: Date.now(),
-          requestCount: 0,
-          lastRequest: Date.now(),
-        };
-
-        transports.set(newSessionId, entry);
-        console.log(`Created new session: ${newSessionId}`);
-      }
-
-      // Handle request via transport with error boundary
-      try {
-        await entry.transport.handleRequest(req as any, res as any, req.body);
-      } catch (transportError) {
-        console.error('Transport error:', transportError);
-
-        // Only send response if headers not already sent
-        if (!res.headersSent) {
-          res.status(500).json({
-            jsonrpc: '2.0',
-            error: {
-              code: -32603,
-              message: 'Transport error',
-              data: transportError instanceof Error ? transportError.message : String(transportError)
-            },
-            id: null
-          });
+        try {
+          await transport.handleRequest(req as any, res as any, req.body);
+        } catch (transportError) {
+          console.error('Transport error:', transportError);
+          if (!res.headersSent) {
+            res.status(500).json({
+              jsonrpc: '2.0',
+              error: {
+                code: ErrorCode.InternalError,
+                message: 'Transport error',
+                data: transportError instanceof Error ? transportError.message : String(transportError)
+              },
+              id: requestId
+            });
+          }
         }
+        return;
       }
 
+      // Stateful mode - check for existing session or create new one
+      if (entry) {
+        // Check rate limit for existing session
+        if (!checkRateLimit(sessionId!)) {
+          res.status(429).json({
+            jsonrpc: '2.0',
+            error: { code: -32000, message: 'Rate limit exceeded' },
+            id: requestId
+          });
+          return;
+        }
+
+        // Reuse existing transport
+        try {
+          await entry.transport.handleRequest(req as any, res as any, req.body);
+        } catch (transportError) {
+          console.error('Transport error:', transportError);
+          if (!res.headersSent) {
+            res.status(500).json({
+              jsonrpc: '2.0',
+              error: {
+                code: ErrorCode.InternalError,
+                message: 'Transport error',
+                data: transportError instanceof Error ? transportError.message : String(transportError)
+              },
+              id: requestId
+            });
+          }
+        }
+      } else if (!sessionId && isInitializeRequest(req.body)) {
+        // New initialization request - create new session
+        const eventStore = new SimpleEventStore();
+        let transport: StreamableHTTPServerTransport;
+
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          enableJsonResponse: false,
+          eventStore,
+          onsessioninitialized: (newSessionId: string) => {
+            // Store session in callback to avoid race conditions
+            console.log(`Session initialized: ${newSessionId}`);
+            transports.set(newSessionId, {
+              transport,
+              server,
+              created: Date.now(),
+              requestCount: 1,
+              lastRequest: Date.now(),
+            });
+          }
+        });
+
+        const server = createMcpServer();
+        await server.connect(transport);
+
+        try {
+          await transport.handleRequest(req as any, res as any, req.body);
+        } catch (transportError) {
+          console.error('Transport error:', transportError);
+          if (!res.headersSent) {
+            res.status(500).json({
+              jsonrpc: '2.0',
+              error: {
+                code: ErrorCode.InternalError,
+                message: 'Transport error',
+                data: transportError instanceof Error ? transportError.message : String(transportError)
+              },
+              id: requestId
+            });
+          }
+        }
+      } else {
+        // Invalid request - no session ID or not initialization request
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: ErrorCode.InvalidRequest,
+            message: 'Bad Request: No valid session ID provided',
+          },
+          id: requestId
+        });
+      }
     } catch (error) {
-      console.error('Error handling request:', error);
+      console.error('Error handling POST request:', error);
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: '2.0',
           error: {
-            code: -32603,
+            code: ErrorCode.InternalError,
             message: 'Internal error',
             data: error instanceof Error ? error.message : String(error)
           },
-          id: null
+          id: requestId
+        });
+      }
+    }
+  });
+
+  // MCP GET endpoint - Handle SSE streams for resumability
+  app.get('/mcp', async (req: Request, res: Response) => {
+    const requestId = req?.body?.id;
+
+    try {
+      const sessionId = Array.isArray(req.headers['mcp-session-id'])
+        ? req.headers['mcp-session-id'][0]
+        : req.headers['mcp-session-id'];
+
+      if (!sessionId || !transports.has(sessionId)) {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: ErrorCode.InvalidRequest,
+            message: 'Bad Request: No valid session ID provided',
+          },
+          id: requestId
+        });
+        return;
+      }
+
+      // Check for Last-Event-ID header for resumability
+      const lastEventId = req.headers['last-event-id'] as string | undefined;
+      if (lastEventId) {
+        console.log(`Client reconnecting with Last-Event-ID: ${lastEventId}`);
+      } else {
+        console.log(`Establishing new SSE stream for session ${sessionId}`);
+      }
+
+      const entry = transports.get(sessionId)!;
+
+      try {
+        await entry.transport.handleRequest(req as any, res as any, req.body);
+      } catch (transportError) {
+        console.error('Transport error:', transportError);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: {
+              code: ErrorCode.InternalError,
+              message: 'Transport error',
+              data: transportError instanceof Error ? transportError.message : String(transportError)
+            },
+            id: requestId
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error handling GET request:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: {
+            code: ErrorCode.InternalError,
+            message: 'Internal error',
+            data: error instanceof Error ? error.message : String(error)
+          },
+          id: requestId
+        });
+      }
+    }
+  });
+
+  // MCP DELETE endpoint - Handle session termination
+  app.delete('/mcp', async (req: Request, res: Response) => {
+    const requestId = req?.body?.id;
+
+    try {
+      const sessionId = Array.isArray(req.headers['mcp-session-id'])
+        ? req.headers['mcp-session-id'][0]
+        : req.headers['mcp-session-id'];
+
+      if (!sessionId || !transports.has(sessionId)) {
+        res.status(400).json({
+          jsonrpc: '2.0',
+          error: {
+            code: ErrorCode.InvalidRequest,
+            message: 'Bad Request: No valid session ID provided',
+          },
+          id: requestId
+        });
+        return;
+      }
+
+      console.log(`Received session termination request for session ${sessionId}`);
+
+      const entry = transports.get(sessionId)!;
+
+      // Clean up event store
+      const eventStore = (entry.transport as any)._eventStore as SimpleEventStore | undefined;
+      if (eventStore?.deleteSession) {
+        await eventStore.deleteSession(sessionId);
+      }
+
+      try {
+        await entry.transport.handleRequest(req as any, res as any, req.body);
+      } catch (transportError) {
+        console.error('Transport error:', transportError);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: '2.0',
+            error: {
+              code: ErrorCode.InternalError,
+              message: 'Error handling session termination',
+              data: transportError instanceof Error ? transportError.message : String(transportError)
+            },
+            id: requestId
+          });
+        }
+      }
+
+      // Remove from transports map
+      transports.delete(sessionId);
+    } catch (error) {
+      console.error('Error handling DELETE request:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: {
+            code: ErrorCode.InternalError,
+            message: 'Error handling session termination',
+            data: error instanceof Error ? error.message : String(error)
+          },
+          id: requestId
         });
       }
     }
@@ -608,15 +819,16 @@ async function startServer() {
 ╟────────────────────────────────────────────────╢
 ║  Version:   ${VERSION.padEnd(34)} ║
 ║  Protocol:  Streamable HTTP (MCP Spec)${' '.repeat(7)}║
+║  Mode:      ${STATELESS ? 'Stateless' : 'Stateful (Session-based)'}${' '.repeat(STATELESS ? 16 : 3)}║
 ║  Endpoint:  http://${HOST}:${PORT}/mcp${' '.repeat(Math.max(0, 17 - HOST.length - PORT.toString().length))}║
 ║  Health:    http://${HOST}:${PORT}/health${' '.repeat(Math.max(0, 13 - HOST.length - PORT.toString().length))}║
 ╟────────────────────────────────────────────────╢
 ║  Security:                                     ║
 ║    • API Key:       ${API_KEY ? '✓ Enabled' : '✗ Disabled'}${' '.repeat(API_KEY ? 18 : 19)}║
 ║    • CORS:          ${CORS_ORIGIN.padEnd(25)} ║
-║    • Rate Limit:    ${RATE_LIMIT}/min per session${' '.repeat(Math.max(0, 11 - RATE_LIMIT.toString().length))}║
+${STATELESS ? '' : `║    • Rate Limit:    ${RATE_LIMIT}/min per session${' '.repeat(Math.max(0, 11 - RATE_LIMIT.toString().length))}║
 ║    • Session Timeout: ${(SESSION_TIMEOUT / 60000).toFixed(0)} minutes${' '.repeat(Math.max(0, 18 - (SESSION_TIMEOUT / 60000).toFixed(0).length))}║
-╚════════════════════════════════════════════════╝
+`}╚════════════════════════════════════════════════╝
     `);
 
     if (!API_KEY) {
