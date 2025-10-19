@@ -18,7 +18,8 @@
     "url": "git+https://github.com/kevinwatt/yt-dlp-mcp.git"
   },
   "bin": {
-    "yt-dlp-mcp": "lib/index.mjs"
+    "yt-dlp-mcp": "lib/index.mjs",
+    "yt-dlp-mcp-http": "lib/server-http.mjs"
   },
   "files": [
     "lib",
@@ -26,8 +27,10 @@
   ],
   "main": "./lib/index.mjs",
   "scripts": {
-    "prepare": "tsc --skipLibCheck && chmod +x ./lib/index.mjs",
-    "test": "PYTHONPATH= PYTHONHOME= node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --forceExit"
+    "prepare": "tsc --skipLibCheck && chmod +x ./lib/index.mjs && chmod +x ./lib/server-http.mjs",
+    "test": "PYTHONPATH= PYTHONHOME= node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles --forceExit",
+    "start:http": "node lib/server-http.mjs",
+    "dev:http": "tsc --skipLibCheck && node lib/server-http.mjs"
   },
   "author": "Dewei Yen <k@funmula.com>",
   "license": "MIT",
@@ -39,6 +42,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.7.0",
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
     "rimraf": "^6.0.1",
     "spawn-rx": "^4.0.0",
     "zod": "^4.1.12"
@@ -46,6 +51,9 @@
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.14",
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.10.5",
     "jest": "^29.7.0",
     "shx": "^0.3.4",
     "ts-jest": "^29.2.5",
