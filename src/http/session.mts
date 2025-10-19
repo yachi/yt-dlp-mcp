@@ -10,7 +10,9 @@ import { SESSION_TIMEOUT } from "./config.mjs";
 export interface TransportEntry {
   transport: StreamableHTTPServerTransport;
   server: Server;
+  eventStore: SimpleEventStore;
   created: number;
+  lastActivity: number;
 }
 
 export class SessionManager {
@@ -33,19 +35,26 @@ export class SessionManager {
   }
 
   /**
+   * Update session activity timestamp
+   */
+  touch(sessionId: string): void {
+    const entry = this.transports.get(sessionId);
+    if (entry) {
+      entry.lastActivity = Date.now();
+    }
+  }
+
+  /**
    * Clean up expired sessions to prevent memory leaks
    */
   async cleanupExpired(): Promise<void> {
     const now = Date.now();
     for (const [sessionId, entry] of this.transports.entries()) {
-      if (now - entry.created > SESSION_TIMEOUT) {
+      if (now - entry.lastActivity > SESSION_TIMEOUT) {
         console.log(`Cleaning up expired session: ${sessionId}`);
 
         // Clean up event store
-        const eventStore = (entry.transport as any)._eventStore as SimpleEventStore | undefined;
-        if (eventStore?.deleteSession) {
-          await eventStore.deleteSession(sessionId);
-        }
+        await entry.eventStore.deleteSession(sessionId);
 
         entry.transport.close();
         this.transports.delete(sessionId);
@@ -61,11 +70,7 @@ export class SessionManager {
     for (const [sessionId, entry] of this.transports.entries()) {
       console.log(`Closing session: ${sessionId}`);
 
-      const eventStore = (entry.transport as any)._eventStore as SimpleEventStore | undefined;
-      if (eventStore?.deleteSession) {
-        closePromises.push(eventStore.deleteSession(sessionId));
-      }
-
+      closePromises.push(entry.eventStore.deleteSession(sessionId));
       entry.transport.close();
     }
 

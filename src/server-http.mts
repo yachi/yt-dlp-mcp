@@ -49,7 +49,7 @@ async function startServer() {
   // Configure CORS
   app.use(cors({
     origin: CORS_ORIGIN,
-    credentials: true,
+    credentials: CORS_ORIGIN !== '*', // credentials not allowed with wildcard origin
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   }));
 
@@ -60,7 +60,7 @@ async function startServer() {
   app.use('/mcp', rateLimitMiddleware);
 
   // Health check endpoint
-  app.get('/health', handleHealthCheck);
+  app.get('/health', (req, res) => handleHealthCheck(req, res, sessionManager));
 
   // MCP endpoints
   app.post('/mcp', (req, res) => handleMcpPost(req, res, sessionManager));

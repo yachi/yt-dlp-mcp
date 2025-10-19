@@ -16,13 +16,14 @@ import { VERSION } from "./config.mjs";
 /**
  * Health check endpoint
  */
-export async function handleHealthCheck(_req: Request, res: Response): Promise<void> {
+export async function handleHealthCheck(_req: Request, res: Response, sessionManager?: SessionManager): Promise<void> {
   try {
     // Check if yt-dlp is available
     await _spawnPromise('yt-dlp', ['--version']);
     res.json({
       status: 'ok',
       version: VERSION,
+      sessions: sessionManager?.size ?? 0,
     });
   } catch (error) {
     res.status(503).json({
@@ -50,9 +51,11 @@ export async function handleMcpPost(
     let entry = sessionId ? sessionManager.get(sessionId) : undefined;
 
     if (entry) {
+      // Update activity timestamp
+      sessionManager.touch(sessionId!);
+
       // Reuse existing transport
       try {
-        // Type-safe request handling - no 'as any' needed
         await entry.transport.handleRequest(req, res, req.body);
       } catch (transportError) {
         handleTransportError(transportError, requestId, res);
@@ -68,10 +71,13 @@ export async function handleMcpPost(
         eventStore,
         onsessioninitialized: (newSessionId: string) => {
           console.log(`Session initialized: ${newSessionId}`);
+          const now = Date.now();
           sessionManager.set(newSessionId, {
             transport,
             server,
-            created: Date.now(),
+            eventStore,
+            created: now,
+            lastActivity: now,
           });
         }
       });
@@ -111,6 +117,9 @@ export async function handleMcpGet(
       sendInvalidRequestError(res, requestId, 'Bad Request: No valid session ID provided');
       return;
     }
+
+    // Update activity timestamp
+    sessionManager.touch(sessionId);
 
     const lastEventId = req.headers['last-event-id'] as string | undefined;
     if (lastEventId) {
@@ -156,10 +165,7 @@ export async function handleMcpDelete(
     const entry = sessionManager.get(sessionId)!;
 
     // Clean up event store
-    const eventStore = (entry.transport as any)._eventStore as SimpleEventStore | undefined;
-    if (eventStore?.deleteSession) {
-      await eventStore.deleteSession(sessionId);
-    }
+    await entry.eventStore.deleteSession(sessionId);
 
     try {
       await entry.transport.handleRequest(req, res, req.body);
