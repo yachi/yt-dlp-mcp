@@ -25,6 +25,18 @@ import {
 import { VERSION } from "../http/config.mjs";
 
 /**
+ * Convert Zod schema to JSON Schema with additionalProperties: true
+ * This ensures n8n's json-schema-to-zod conversion works correctly
+ */
+function toJSONSchemaWithAdditionalProps(schema: z.ZodType): any {
+  const jsonSchema = z.toJSONSchema(schema);
+  return {
+    ...jsonSchema,
+    additionalProperties: true
+  };
+}
+
+/**
  * Generic tool execution handler with error handling
  */
 async function handleToolExecution<T>(
@@ -71,42 +83,42 @@ export function createMcpServer(): Server {
         {
           name: "ytdlp_search_videos",
           description: "Search for videos on YouTube with pagination support",
-          inputSchema: SearchVideosSchema,
+          inputSchema: toJSONSchemaWithAdditionalProps(SearchVideosSchema),
         },
         {
           name: "ytdlp_list_subtitle_languages",
           description: "List all available subtitle languages for a video",
-          inputSchema: ListSubtitleLanguagesSchema,
+          inputSchema: toJSONSchemaWithAdditionalProps(ListSubtitleLanguagesSchema),
         },
         {
           name: "ytdlp_download_video_subtitles",
           description: "Download video subtitles in VTT format",
-          inputSchema: DownloadVideoSubtitlesSchema,
+          inputSchema: toJSONSchemaWithAdditionalProps(DownloadVideoSubtitlesSchema),
         },
         {
           name: "ytdlp_download_video",
           description: "Download video file to Downloads folder",
-          inputSchema: DownloadVideoSchema,
+          inputSchema: toJSONSchemaWithAdditionalProps(DownloadVideoSchema),
         },
         {
           name: "ytdlp_download_audio",
           description: "Extract and download audio from video",
-          inputSchema: DownloadAudioSchema,
+          inputSchema: toJSONSchemaWithAdditionalProps(DownloadAudioSchema),
         },
         {
           name: "ytdlp_download_transcript",
           description: "Generate clean plain text transcript",
-          inputSchema: DownloadTranscriptSchema,
+          inputSchema: toJSONSchemaWithAdditionalProps(DownloadTranscriptSchema),
         },
         {
           name: "ytdlp_get_video_metadata",
           description: "Extract comprehensive video metadata in JSON format",
-          inputSchema: GetVideoMetadataSchema,
+          inputSchema: toJSONSchemaWithAdditionalProps(GetVideoMetadataSchema),
         },
         {
           name: "ytdlp_get_video_metadata_summary",
           description: "Get human-readable summary of key video information",
-          inputSchema: GetVideoMetadataSummarySchema,
+          inputSchema: toJSONSchemaWithAdditionalProps(GetVideoMetadataSummarySchema),
         },
       ],
     };
